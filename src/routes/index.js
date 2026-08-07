@@ -70,4 +70,8 @@ router.use('/checkout', checkoutRouter);
 router.use('/orders', orderRouter);
 router.use('/admin/orders', adminOrderRouter);
 
+// Payments Module (Razorpay)
+import { paymentRouter } from '../modules/payments/routes/payment.routes.js';
+router.use('/payments', paymentRouter);
+
 export default router;

@@ -231,6 +231,7 @@ model Order {
   user            User             @relation(fields: [userId], references: [id], onDelete: Restrict)
   items           OrderItem[]
   shippingAddress ShippingAddress?
+  payment         Payment?
 
   @@map("orders")
   @@index([userId])
@@ -286,3 +287,28 @@ model OrderItem {
   @@index([productId])
 }
 
+// ────────────────────────────────────────────────────────────────────────────────
+// Payment model (1:1 with Order)
+// ────────────────────────────────────────────────────────────────────────────────
+
+model Payment {
+  id                String        @id @default(uuid()) @db.Uuid
+  orderId           String        @unique @map("order_id") @db.Uuid
+  razorpayOrderId   String        @unique @map("razorpay_order_id")
+  razorpayPaymentId String?       @unique @map("razorpay_payment_id")
+  razorpaySignature String?       @map("razorpay_signature")
+  amount            Decimal       @db.Decimal(10, 2)
+  currency          String        @default("INR")
+  status            PaymentStatus @default(PENDING)
+  method            String?
+  rawWebhookPayload Json?         @map("raw_webhook_payload")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+  @@index([orderId])
+  @@index([razorpayOrderId])
+  @@index([status])
+}

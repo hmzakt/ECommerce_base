@@ -40,6 +40,11 @@ const envSchema = z.object({
   // Rate Limiting
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900_000), // 15 minutes
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
+
+  // Razorpay
+  RAZORPAY_KEY_ID: z.string().default('rzp_test_placeholder_key_id'),
+  RAZORPAY_KEY_SECRET: z.string().default('rzp_test_placeholder_key_secret'),
+  RAZORPAY_WEBHOOK_SECRET: z.string().default('rzp_test_placeholder_webhook_secret'),
 });
 
 // ────────────────────────────────────────────────────────────────────────────────
@@ -109,5 +114,11 @@ export const config = Object.freeze({
   rateLimit: Object.freeze({
     windowMs: env.RATE_LIMIT_WINDOW_MS,
     max: env.RATE_LIMIT_MAX,
+  }),
+
+  razorpay: Object.freeze({
+    keyId: env.RAZORPAY_KEY_ID,
+    keySecret: env.RAZORPAY_KEY_SECRET,
+    webhookSecret: env.RAZORPAY_WEBHOOK_SECRET,
   }),
 });
