@@ -45,7 +45,7 @@ const startServer = async () => {
         env: config.env,
         nodeVersion: process.version,
       },
-      `🚀 Server running on port ${config.server.port} [${config.env}]`,
+      `Server running on port ${config.server.port} [${config.env}]`,
     );
   });
 

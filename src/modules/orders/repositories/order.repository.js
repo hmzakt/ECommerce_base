@@ -115,26 +115,43 @@ export const orderRepository = {
   },
 
   /**
-   * Find all orders for Admin with pagination, status filter, and keyword search.
+   * Find all orders for Admin with pagination, status filter, date range, payment status, and keyword search.
    *
-   * @param {{ skip: number, take: number, status?: string, search?: string }} filters
+   * @param {{ skip: number, take: number, status?: string, paymentStatus?: string, dateFrom?: Date, dateTo?: Date, customerId?: string, search?: string, sortBy?: string }} filters
    * @returns {Promise<object[]>}
    */
-  findAdminOrders: async ({ skip, take, status, search }) => {
+  findAdminOrders: async ({ skip, take, status, paymentStatus, dateFrom, dateTo, customerId, search, sortBy = 'newest' }) => {
     const where = {};
 
     if (status) {
       where.status = status;
     }
 
+    if (paymentStatus) {
+      where.paymentStatus = paymentStatus;
+    }
+
+    if (customerId) {
+      where.userId = customerId;
+    }
+
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) where.createdAt.gte = dateFrom;
+      if (dateTo) where.createdAt.lte = dateTo;
+    }
+
     if (search) {
       where.OR = [
+        { id: { contains: search, mode: 'insensitive' } },
         { orderNumber: { contains: search, mode: 'insensitive' } },
         { user: { firstName: { contains: search, mode: 'insensitive' } } },
         { user: { lastName: { contains: search, mode: 'insensitive' } } },
         { user: { email: { contains: search, mode: 'insensitive' } } },
       ];
     }
+
+    const orderBy = sortBy === 'oldest' ? { createdAt: 'asc' } : { createdAt: 'desc' };
 
     return prisma.order.findMany({
       where,
@@ -151,25 +168,40 @@ export const orderRepository = {
       },
       skip,
       take,
-      orderBy: { createdAt: 'desc' },
+      orderBy,
     });
   },
 
   /**
    * Count total orders for Admin matching filters.
    *
-   * @param {{ status?: string, search?: string }} filters
+   * @param {{ status?: string, paymentStatus?: string, dateFrom?: Date, dateTo?: Date, customerId?: string, search?: string }} filters
    * @returns {Promise<number>}
    */
-  countAdminOrders: async ({ status, search }) => {
+  countAdminOrders: async ({ status, paymentStatus, dateFrom, dateTo, customerId, search }) => {
     const where = {};
 
     if (status) {
       where.status = status;
     }
 
+    if (paymentStatus) {
+      where.paymentStatus = paymentStatus;
+    }
+
+    if (customerId) {
+      where.userId = customerId;
+    }
+
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) where.createdAt.gte = dateFrom;
+      if (dateTo) where.createdAt.lte = dateTo;
+    }
+
     if (search) {
       where.OR = [
+        { id: { contains: search, mode: 'insensitive' } },
         { orderNumber: { contains: search, mode: 'insensitive' } },
         { user: { firstName: { contains: search, mode: 'insensitive' } } },
         { user: { lastName: { contains: search, mode: 'insensitive' } } },

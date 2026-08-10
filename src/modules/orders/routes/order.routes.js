@@ -7,6 +7,7 @@ import { Roles } from '../../../common/constants/index.js';
 import {
   orderParamSchema,
   listOrdersQuerySchema,
+  adminListOrdersQuerySchema,
   updateOrderStatusSchema,
 } from '../validators/order.validator.js';
 
@@ -32,6 +33,13 @@ customerRouter.get(
   asyncHandler(orderController.getCustomerOrderById),
 );
 
+// PATCH /orders/:id/cancel
+customerRouter.patch(
+  '/:id/cancel',
+  validate(orderParamSchema),
+  asyncHandler(orderController.cancelOrder),
+);
+
 // ────────────────────────────────────────────────────────────────────────────────
 // Admin Routes (Protected by authenticate + authorize(ADMIN, SUPER_ADMIN))
 // ────────────────────────────────────────────────────────────────────────────────
@@ -41,7 +49,7 @@ adminRouter.use(authorize(Roles.ADMIN, Roles.SUPER_ADMIN));
 // GET /admin/orders
 adminRouter.get(
   '/',
-  validate(listOrdersQuerySchema),
+  validate(adminListOrdersQuerySchema),
   asyncHandler(orderController.getAdminOrders),
 );
 

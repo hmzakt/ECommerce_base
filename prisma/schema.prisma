@@ -232,6 +232,7 @@ model Order {
   items           OrderItem[]
   shippingAddress ShippingAddress?
   payment         Payment?
+  shipping        Shipping?
 
   @@map("orders")
   @@index([userId])
@@ -312,3 +313,37 @@ model Payment {
   @@index([razorpayOrderId])
   @@index([status])
 }
+
+// ────────────────────────────────────────────────────────────────────────────────
+// Shipping Enums & Models
+// ────────────────────────────────────────────────────────────────────────────────
+
+enum ShippingStatus {
+  PENDING
+  PACKED
+  SHIPPED
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  FAILED
+  RETURNED
+}
+
+model Shipping {
+  id               String         @id @default(uuid()) @db.Uuid
+  orderId          String         @unique @map("order_id") @db.Uuid
+  trackingNumber   String?        @map("tracking_number")
+  shippingProvider String?        @map("shipping_provider")
+  estimatedDelivery DateTime?     @map("estimated_delivery")
+  actualDelivery   DateTime?      @map("actual_delivery")
+  status           ShippingStatus @default(PENDING)
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  order            Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("shippings")
+  @@index([orderId])
+  @@index([status])
+}
+

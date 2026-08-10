@@ -36,6 +36,22 @@ export const orderController = {
   },
 
   /**
+   * PATCH /orders/:id/cancel
+   * Customer: Cancel own order (only if PENDING/CONFIRMED/PROCESSING)
+   */
+  cancelOrder: async (req, res) => {
+    const order = await orderService.cancelCustomerOrder(
+      req.user.userId,
+      req.params.id,
+    );
+
+    sendSuccess(res, {
+      message: 'Order cancelled successfully',
+      data: { order },
+    });
+  },
+
+  /**
    * GET /admin/orders
    * Admin: Get paginated list of all orders
    */

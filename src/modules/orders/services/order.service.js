@@ -10,20 +10,54 @@ import { AppError } from '../../../common/errors/AppError.js';
 import { ErrorCodes } from '../../../common/errors/errorCodes.js';
 import { logger } from '../../../common/logger/index.js';
 import { buildPaginationMeta } from '../../../common/utils/response.js';
+import { emailService } from '../../../common/email/email.service.js';
+
+// ─── Status Transition Rules ────────────────────────────────────────────────────
 
 /**
- * Generate a unique, human-readable order number.
- * Format: ORD-YYYYMMDD-XXXX (e.g. ORD-20260808-A7B9)
+ * Allowed forward transitions per status.
+ * Cancellation is handled separately.
  */
+const VALID_TRANSITIONS = {
+  PENDING:    ['CONFIRMED', 'CANCELLED'],
+  CONFIRMED:  ['PROCESSING', 'CANCELLED'],
+  PROCESSING: ['SHIPPED', 'CANCELLED'],
+  SHIPPED:    ['DELIVERED'],
+  DELIVERED:  [],
+  CANCELLED:  [],
+};
+
+/**
+ * Statuses from which a customer can cancel.
+ */
+const CUSTOMER_CANCELLABLE_STATUSES = ['PENDING', 'CONFIRMED', 'PROCESSING'];
+
+/**
+ * Validate an order status transition. Throws if invalid.
+ *
+ * @param {string} fromStatus
+ * @param {string} toStatus
+ */
+const validateTransition = (fromStatus, toStatus) => {
+  const allowed = VALID_TRANSITIONS[fromStatus] ?? [];
+  if (!allowed.includes(toStatus)) {
+    throw AppError.badRequest(
+      `Cannot transition order from ${fromStatus} to ${toStatus}.`,
+      ErrorCodes.ORDER_INVALID_STATUS_TRANSITION,
+    );
+  }
+};
+
+// ─── Order Number Generator ─────────────────────────────────────────────────────
+
 const generateOrderNumber = () => {
   const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const randomHex = Math.random().toString(36).substring(2, 6).toUpperCase();
   return `ORD-${dateStr}-${randomHex}`;
 };
 
-/**
- * Format Prisma Decimal / number fields into clean string representations for API response.
- */
+// ─── Response Shaping ───────────────────────────────────────────────────────────
+
 const shapeOrder = (order) => ({
   id: order.id,
   orderNumber: order.orderNumber,
@@ -67,30 +101,26 @@ const shapeOrder = (order) => ({
   })),
 });
 
+// ─── Service ────────────────────────────────────────────────────────────────────
+
 export const orderService = {
   /**
    * Process checkout: Converts active user cart into an immutable order.
+   * Also auto-initializes a Shipping record (PENDING) for the new order.
    * Executed atomically inside a PostgreSQL transaction.
    *
    * @param {string} userId
    * @param {object} shippingAddress - Validated shipping address payload
-   * @returns {Promise<object>} Shaped order
    */
   processCheckout: async (userId, shippingAddress) => {
-    return prisma.$transaction(async (tx) => {
-      // 1. Fetch user's active cart with cart items and current product details
+    const order = await prisma.$transaction(async (tx) => {
+      // 1. Fetch cart with items and product details
       const cart = await tx.cart.findUnique({
         where: { userId },
-        include: {
-          items: {
-            include: {
-              product: true,
-            },
-          },
-        },
+        include: { items: { include: { product: true } } },
       });
 
-      // 2. Validate cart exists and is not empty
+      // 2. Validate cart
       if (!cart || cart.items.length === 0) {
         throw AppError.badRequest(
           'Your cart is empty. Please add items before checking out.',
@@ -98,13 +128,12 @@ export const orderService = {
         );
       }
 
-      // 3. Validate every product in cart is active and available
+      // 3. Validate products and build order items
       let calculatedSubtotal = 0;
       const orderItemsData = [];
 
       for (const item of cart.items) {
         const product = item.product;
-
         if (!product || !product.isActive) {
           throw AppError.badRequest(
             `Product "${product?.name || item.productId}" is no longer available.`,
@@ -116,7 +145,6 @@ export const orderService = {
         const lineTotal = unitPrice * item.quantity;
         calculatedSubtotal += lineTotal;
 
-        // Immutable snapshot of product details at time of purchase
         orderItemsData.push({
           productId: product.id,
           productName: product.name,
@@ -127,17 +155,14 @@ export const orderService = {
         });
       }
 
-      // 4. Server-side total calculation (never trust client totals)
+      // 4. Server-side totals
       const shippingCost = 0.0;
       const tax = 0.0;
       const calculatedTotal = calculatedSubtotal + shippingCost + tax;
 
-      // 5. Generate unique order number
-      const orderNumber = generateOrderNumber();
-
-      // 6. Create order with nested order items and shipping address
+      // 5. Create order
       const createdOrder = await orderRepository.createOrderInTransaction(tx, {
-        orderNumber,
+        orderNumber: generateOrderNumber(),
         userId,
         status: 'PENDING',
         paymentStatus: 'PENDING',
@@ -149,29 +174,42 @@ export const orderService = {
         shippingAddress,
       });
 
-      // 7. Clear items from the user's cart
-      await tx.cartItem.deleteMany({
-        where: { cartId: cart.id },
+      // 6. Auto-initialize Shipping record
+      await tx.shipping.create({
+        data: { orderId: createdOrder.id, status: 'PENDING' },
       });
 
+      // 7. Clear cart items
+      await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
+
       logger.info(
-        { userId, orderId: createdOrder.id, orderNumber, total: calculatedTotal },
+        { userId, orderId: createdOrder.id, orderNumber: createdOrder.orderNumber },
         'Checkout processed successfully',
       );
 
-      return shapeOrder(createdOrder);
+      return createdOrder;
     });
+
+    // 8. Send order confirmation email asynchronously (outside transaction)
+    const fullOrder = await orderRepository.findOrderById(order.id);
+    if (fullOrder) {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true },
+      });
+      if (user) {
+        await emailService.sendOrderConfirmation(user.email, shapeOrder(fullOrder));
+      }
+    }
+
+    return shapeOrder(fullOrder);
   },
 
   /**
    * Get orders for authenticated customer with pagination.
-   *
-   * @param {string} userId
-   * @param {{ page: number, limit: number }} options
    */
   getCustomerOrders: async (userId, { page, limit }) => {
     const skip = (page - 1) * limit;
-
     const [orders, total] = await Promise.all([
       orderRepository.findUserOrders(userId, { skip, take: limit }),
       orderRepository.countUserOrders(userId),
@@ -184,32 +222,62 @@ export const orderService = {
   },
 
   /**
-   * Get single order by ID for customer (enforces ownership).
-   *
-   * @param {string} userId
-   * @param {string} orderId
+   * Get a single order by ID for customer (enforces ownership).
    */
   getCustomerOrderById: async (userId, orderId) => {
+    const order = await orderRepository.findOrderById(orderId);
+    if (!order || order.userId !== userId) {
+      throw AppError.notFound('Order not found', ErrorCodes.ORDER_NOT_FOUND);
+    }
+    return shapeOrder(order);
+  },
+
+  /**
+   * Customer cancels their own order.
+   * Only allowed before the order is SHIPPED.
+   */
+  cancelCustomerOrder: async (userId, orderId) => {
     const order = await orderRepository.findOrderById(orderId);
 
     if (!order || order.userId !== userId) {
       throw AppError.notFound('Order not found', ErrorCodes.ORDER_NOT_FOUND);
     }
 
-    return shapeOrder(order);
+    if (!CUSTOMER_CANCELLABLE_STATUSES.includes(order.status)) {
+      throw AppError.badRequest(
+        `Orders with status "${order.status}" cannot be cancelled. Only PENDING, CONFIRMED, and PROCESSING orders can be cancelled.`,
+        ErrorCodes.ORDER_INVALID_STATUS_TRANSITION,
+      );
+    }
+
+    const updatedOrder = await orderRepository.updateOrderStatus(orderId, { status: 'CANCELLED' });
+
+    logger.info({ userId, orderId, previousStatus: order.status }, 'Customer cancelled order');
+
+    return shapeOrder(updatedOrder);
   },
 
   /**
-   * Get orders for Admin with pagination, status filtering, and keyword search.
-   *
-   * @param {{ page: number, limit: number, status?: string, search?: string }} options
+   * Get all orders (Admin) with full filter, search, and pagination support.
    */
-  getAdminOrders: async ({ page, limit, status, search }) => {
+  getAdminOrders: async ({ page, limit, status, paymentStatus, dateFrom, dateTo, customerId, search, sortBy }) => {
     const skip = (page - 1) * limit;
 
+    const filters = {
+      skip,
+      take: limit,
+      status,
+      paymentStatus,
+      dateFrom: dateFrom ? new Date(dateFrom) : undefined,
+      dateTo: dateTo ? new Date(dateTo) : undefined,
+      customerId,
+      search,
+      sortBy,
+    };
+
     const [orders, total] = await Promise.all([
-      orderRepository.findAdminOrders({ skip, take: limit, status, search }),
-      orderRepository.countAdminOrders({ status, search }),
+      orderRepository.findAdminOrders(filters),
+      orderRepository.countAdminOrders(filters),
     ]);
 
     return {
@@ -219,10 +287,7 @@ export const orderService = {
   },
 
   /**
-   * Update order status and/or payment status (Admin only).
-   *
-   * @param {string} orderId
-   * @param {{ status?: string, paymentStatus?: string }} statusData
+   * Admin updates order status with transition validation.
    */
   updateOrderStatusByAdmin: async (orderId, statusData) => {
     const existingOrder = await orderRepository.findOrderById(orderId);
@@ -231,18 +296,15 @@ export const orderService = {
       throw AppError.notFound('Order not found', ErrorCodes.ORDER_NOT_FOUND);
     }
 
-    // Prevent changing status of CANCELLED orders
-    if (existingOrder.status === 'CANCELLED' && statusData.status && statusData.status !== 'CANCELLED') {
-      throw AppError.badRequest(
-        'Cannot modify the status of a cancelled order.',
-        ErrorCodes.ORDER_INVALID_STATUS_TRANSITION,
-      );
+    // Enforce transition rules when a new status is provided
+    if (statusData.status && statusData.status !== existingOrder.status) {
+      validateTransition(existingOrder.status, statusData.status);
     }
 
     const updatedOrder = await orderRepository.updateOrderStatus(orderId, statusData);
 
     logger.info(
-      { orderId, oldStatus: existingOrder.status, newStatus: statusData.status || existingOrder.status },
+      { orderId, oldStatus: existingOrder.status, newStatus: statusData.status ?? existingOrder.status },
       'Order status updated by Admin',
     );
 

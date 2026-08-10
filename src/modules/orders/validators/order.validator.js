@@ -79,20 +79,30 @@ export const orderParamSchema = z.object({
 
 export const listOrdersQuerySchema = z.object({
   query: z.object({
-    page: z.coerce
-      .number()
-      .int()
-      .positive()
-      .default(Pagination.DEFAULT_PAGE),
-    limit: z.coerce
-      .number()
-      .int()
-      .positive()
-      .max(Pagination.MAX_LIMIT)
-      .default(Pagination.DEFAULT_LIMIT),
+    page: z.coerce.number().int().positive().default(Pagination.DEFAULT_PAGE),
+    limit: z.coerce.number().int().positive().max(Pagination.MAX_LIMIT).default(Pagination.DEFAULT_LIMIT),
     status: z
       .enum(['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED'])
       .optional(),
     search: z.string().trim().optional(),
   }),
 });
+
+export const adminListOrdersQuerySchema = z.object({
+  query: z.object({
+    page: z.coerce.number().int().positive().default(Pagination.DEFAULT_PAGE),
+    limit: z.coerce.number().int().positive().max(Pagination.MAX_LIMIT).default(Pagination.DEFAULT_LIMIT),
+    status: z
+      .enum(['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED'])
+      .optional(),
+    paymentStatus: z
+      .enum(['PENDING', 'PAID', 'FAILED', 'REFUNDED'])
+      .optional(),
+    dateFrom: z.string().datetime({ message: 'dateFrom must be a valid ISO date' }).optional(),
+    dateTo: z.string().datetime({ message: 'dateTo must be a valid ISO date' }).optional(),
+    customerId: z.string().uuid('Invalid customer ID').optional(),
+    search: z.string().trim().optional(),
+    sortBy: z.enum(['newest', 'oldest']).default('newest'),
+  }),
+});
+

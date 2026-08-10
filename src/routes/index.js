@@ -74,4 +74,14 @@ router.use('/admin/orders', adminOrderRouter);
 import { paymentRouter } from '../modules/payments/routes/payment.routes.js';
 router.use('/payments', paymentRouter);
 
+// Shipping Module
+import { shippingRouter, adminShippingRouter } from '../modules/shipping/routes/shipping.routes.js';
+router.use('/orders', shippingRouter);            // GET /orders/:id/shipping
+router.use('/admin/shipping', adminShippingRouter); // PATCH /admin/shipping/:id
+
+// Admin Dashboard Module
+import { dashboardRouter } from '../modules/dashboard/routes/dashboard.routes.js';
+router.use('/admin/dashboard', dashboardRouter);
+
 export default router;
+
