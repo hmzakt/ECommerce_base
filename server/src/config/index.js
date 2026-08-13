@@ -12,6 +12,7 @@
 
 import 'dotenv/config';
 import { z } from 'zod';
+import { v2 as cloudinary } from 'cloudinary';
 
 // ────────────────────────────────────────────────────────────────────────────────
 // Schema definition
@@ -122,3 +123,9 @@ export const config = Object.freeze({
     webhookSecret: env.RAZORPAY_WEBHOOK_SECRET,
   }),
 });
+
+cloudinary.config({
+  secure: true
+});
+
+console.log(cloudinary.config());
