@@ -25,6 +25,7 @@ interface AuthContextValue {
   login: (payload: LoginPayload) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
+  fetchMe: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -106,6 +107,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     saveToken(null);
   }, [accessToken, saveToken]);
 
+  const fetchMe = useCallback(async () => {
+    if (accessToken) {
+      try {
+        const { user: u } = await getMeApi(accessToken);
+        setUser(u);
+      } catch (error) {
+        // failed to fetch me
+      }
+    }
+  }, [accessToken]);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -115,8 +127,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       login,
       register,
       logout,
+      fetchMe,
     }),
-    [user, accessToken, isLoading, login, register, logout],
+    [user, accessToken, isLoading, login, register, logout, fetchMe],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

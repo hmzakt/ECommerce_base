@@ -69,3 +69,23 @@ export const generateRefreshToken = () => {
 export const verifyAccessToken = (token, options = {}) => {
   return jwt.verify(token, config.jwt.accessSecret, options);
 };
+
+/**
+ * Generate a JWT for email verification.
+ */
+export const generateEmailVerificationToken = (userId) => {
+  return jwt.sign({ userId, type: 'email_verification' }, config.jwt.accessSecret, {
+    expiresIn: '1d',
+  });
+};
+
+/**
+ * Verify an email verification token.
+ */
+export const verifyEmailVerificationToken = (token) => {
+  const decoded = jwt.verify(token, config.jwt.accessSecret);
+  if (decoded.type !== 'email_verification') {
+    throw new Error('Invalid token type');
+  }
+  return decoded;
+};

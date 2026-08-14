@@ -53,3 +53,20 @@ export const loginSchema = z.object({
     password: z.string({ required_error: 'Password is required' }),
   }),
 });
+
+export const forgotPasswordSchema = z.object({
+  body: z.object({
+    email: z
+      .string({ required_error: 'Email is required' })
+      .trim()
+      .email('Invalid email address')
+      .toLowerCase(),
+  }),
+});
+
+export const resetPasswordSchema = z.object({
+  body: z.object({
+    token: z.string({ required_error: 'Reset token is required' }),
+    newPassword: passwordSchema,
+  }),
+});

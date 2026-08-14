@@ -47,9 +47,15 @@ export const authService = {
     const refreshTokenHash = await hashData(refreshToken);
     await userRepository.updateRefreshToken(user.id, refreshTokenHash);
 
+    // 6. Generate and log email verification link
+    const { generateEmailVerificationToken } = await import('../../common/utils/crypto.js');
+    const emailToken = generateEmailVerificationToken(user.id);
+    const verifyUrl = `http://localhost:3001/verify-email?token=${emailToken}`;
+    logger.info({ userId: user.id, verifyUrl }, 'MOCK EMAIL: Email verification link generated');
+
     logger.info({ userId: user.id }, 'New user registered successfully');
 
-    // 6. Return user details (without sensitive fields) and tokens
+    // 7. Return user details (without sensitive fields) and tokens
     return {
       user: {
         id: user.id,
@@ -61,6 +67,34 @@ export const authService = {
       accessToken,
       refreshToken,
     };
+  },
+
+  /**
+   * Resend verification email
+   */
+  resendVerificationEmail: async (userId) => {
+    const user = await userRepository.findById(userId);
+    if (!user) throw AppError.notFound('User not found');
+    if (user.isEmailVerified) throw AppError.badRequest('Email is already verified');
+
+    const { generateEmailVerificationToken } = await import('../../common/utils/crypto.js');
+    const emailToken = generateEmailVerificationToken(user.id);
+    const verifyUrl = `http://localhost:3001/verify-email?token=${emailToken}`;
+    logger.info({ userId: user.id, verifyUrl }, 'MOCK EMAIL: Email verification link generated');
+  },
+
+  /**
+   * Verify email using token
+   */
+  verifyEmail: async (token) => {
+    const { verifyEmailVerificationToken } = await import('../../common/utils/crypto.js');
+    try {
+      const decoded = verifyEmailVerificationToken(token);
+      await userRepository.verifyEmail(decoded.userId);
+      logger.info({ userId: decoded.userId }, 'Email verified successfully');
+    } catch (err) {
+      throw AppError.badRequest('Invalid or expired verification token', ErrorCodes.VALIDATION_ERROR);
+    }
   },
 
   /**
@@ -161,5 +195,58 @@ export const authService = {
   logout: async (userId) => {
     await userRepository.clearRefreshToken(userId);
     logger.info({ userId }, 'User logged out successfully');
+  },
+
+  /**
+   * Request a password reset email.
+   */
+  forgotPassword: async (email) => {
+    const user = await userRepository.findByEmail(email);
+    if (!user) {
+      // Return successfully to prevent email enumeration
+      return;
+    }
+
+    import('crypto').then(async (crypto) => {
+      // 1. Generate token
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const passwordResetToken = crypto
+        .createHash('sha256')
+        .update(resetToken)
+        .digest('hex');
+
+      const passwordResetExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+
+      // 2. Save hashed token
+      await userRepository.update(user.id, {
+        passwordResetToken,
+        passwordResetExpires,
+      });
+
+      // 3. "Send" email (mock)
+      const resetUrl = `http://localhost:3001/reset-password?token=${resetToken}`;
+      logger.info({ email, resetUrl }, 'MOCK EMAIL: Password reset link generated');
+    });
+  },
+
+  /**
+   * Reset password using a valid token.
+   */
+  resetPassword: async (token, newPassword) => {
+    const crypto = await import('crypto');
+    const hashedToken = crypto
+      .createHash('sha256')
+      .update(token)
+      .digest('hex');
+
+    const user = await userRepository.findByPasswordResetToken(hashedToken);
+    if (!user) {
+      throw AppError.badRequest('Token is invalid or has expired.', ErrorCodes.VALIDATION_ERROR);
+    }
+
+    const newPasswordHash = await hashData(newPassword);
+    await userRepository.updatePassword(user.id, newPasswordHash);
+
+    logger.info({ userId: user.id }, 'Password reset successfully');
   },
 };

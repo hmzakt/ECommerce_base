@@ -72,3 +72,19 @@ export async function getMeApi(
 export async function logoutApi(accessToken: string): Promise<void> {
   await authRequest("/auth/logout", { accessToken });
 }
+
+export async function forgotPasswordApi(email: string): Promise<void> {
+  await authRequest("/auth/forgot-password", { body: { email } });
+}
+
+export async function resetPasswordApi(token: string, newPassword: string): Promise<void> {
+  await authRequest("/auth/reset-password", { body: { token, newPassword } });
+}
+
+export async function verifyEmailApi(token: string): Promise<void> {
+  await authRequest("/auth/verify-email", { body: { token } });
+}
+
+export async function resendVerificationApi(accessToken: string): Promise<void> {
+  await authRequest("/auth/resend-verification", { accessToken });
+}

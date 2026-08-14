@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authController } from './auth.controller.js';
 import { validate } from '../../common/middleware/validate.js';
-import { registerSchema, loginSchema } from './auth.schema.js';
+import { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema } from './auth.schema.js';
 import { authenticate } from '../../common/middleware/auth.js';
 import { asyncHandler } from '../../common/utils/asyncHandler.js';
 import rateLimit from 'express-rate-limit';
@@ -45,6 +45,26 @@ router.post(
   asyncHandler(authController.refresh)
 );
 
+router.post(
+  '/forgot-password',
+  authLimiter,
+  validate(forgotPasswordSchema),
+  asyncHandler(authController.forgotPassword)
+);
+
+router.post(
+  '/reset-password',
+  authLimiter,
+  validate(resetPasswordSchema),
+  asyncHandler(authController.resetPassword)
+);
+
+router.post(
+  '/verify-email',
+  authLimiter,
+  asyncHandler(authController.verifyEmail)
+);
+
 // ────────────────────────────────────────────────────────────────────────────────
 // Protected Routes
 // ────────────────────────────────────────────────────────────────────────────────
@@ -53,6 +73,13 @@ router.post(
   '/logout',
   authenticate,
   asyncHandler(authController.logout)
+);
+
+router.post(
+  '/resend-verification',
+  authLimiter,
+  authenticate,
+  asyncHandler(authController.resendVerificationEmail)
 );
 
 router.get(

@@ -139,4 +139,62 @@ export const authController = {
       },
     });
   },
+
+  /**
+   * Request password reset
+   */
+  forgotPassword: async (req, res) => {
+    const { email } = req.body;
+    await authService.forgotPassword(email);
+
+    sendSuccess(res, {
+      message: 'If that email is registered, a password reset link has been sent.',
+    });
+  },
+
+  /**
+   * Reset password
+   */
+  resetPassword: async (req, res) => {
+    const { token, newPassword } = req.body;
+    
+    if (!token || !newPassword) {
+      throw AppError.badRequest('Token and new password are required', ErrorCodes.VALIDATION_ERROR);
+    }
+
+    await authService.resetPassword(token, newPassword);
+
+    sendSuccess(res, {
+      message: 'Password reset successfully. You can now log in.',
+    });
+  },
+
+  /**
+   * Verify Email
+   */
+  verifyEmail: async (req, res) => {
+    const { token } = req.body;
+    
+    if (!token) {
+      throw AppError.badRequest('Verification token is required', ErrorCodes.VALIDATION_ERROR);
+    }
+
+    await authService.verifyEmail(token);
+
+    sendSuccess(res, {
+      message: 'Email verified successfully.',
+    });
+  },
+
+  /**
+   * Resend Verification Email
+   */
+  resendVerificationEmail: async (req, res) => {
+    // req.user is populated by authenticate middleware
+    await authService.resendVerificationEmail(req.user.id);
+
+    sendSuccess(res, {
+      message: 'Verification email sent successfully.',
+    });
+  },
 };

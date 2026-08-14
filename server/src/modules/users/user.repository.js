@@ -134,4 +134,49 @@ export const userRepository = {
       data: { refreshTokenHash: null },
     });
   },
+  /**
+   * Find a user by password reset token
+   *
+   * @param {string} token
+   * @returns {Promise<import('@prisma/client').User | null>}
+   */
+  findByPasswordResetToken: async (token) => {
+    return prisma.user.findFirst({
+      where: {
+        passwordResetToken: token,
+        passwordResetExpires: { gt: new Date() },
+      },
+    });
+  },
+
+  /**
+   * Update a user's password and clear reset token
+   *
+   * @param {string} id
+   * @param {string} newPasswordHash
+   * @returns {Promise<void>}
+   */
+  updatePassword: async (id, newPasswordHash) => {
+    await prisma.user.update({
+      where: { id },
+      data: {
+        passwordHash: newPasswordHash,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+      },
+    });
+  },
+
+  /**
+   * Mark email as verified
+   *
+   * @param {string} id
+   * @returns {Promise<void>}
+   */
+  verifyEmail: async (id) => {
+    await prisma.user.update({
+      where: { id },
+      data: { isEmailVerified: true },
+    });
+  },
 };
