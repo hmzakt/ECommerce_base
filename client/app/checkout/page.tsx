@@ -263,11 +263,11 @@ export default function CheckoutPage() {
               <div className="space-y-4 mb-6 max-h-[40vh] overflow-y-auto pr-2">
                 {cart.items.map((item) => (
                   <div key={item.id} className="flex gap-4">
-                    <div className="relative w-16 h-20 bg-muted/30 flex-shrink-0">
-                      {item.product.images?.[0]?.url && (
+                    <div className="relative w-16 h-20 bg-muted/30 flex-shrink-0 overflow-hidden">
+                      {item.product.image && (
                         <Image
-                          src={item.product.images[0].url}
-                          alt={item.product.name}
+                          src={item.product.image}
+                          alt={item.product.imageAlt || item.product.name}
                           fill
                           className="object-cover"
                         />
@@ -278,7 +278,7 @@ export default function CheckoutPage() {
                       <p className="text-xs text-muted-foreground mt-1">Qty: {item.quantity}</p>
                     </div>
                     <div className="text-sm font-medium">
-                      ${(Number(item.price) * item.quantity).toFixed(2)}
+                      ${item.lineTotal}
                     </div>
                   </div>
                 ))}
@@ -299,14 +299,14 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              <Button 
-                type="submit" 
+              <button
+                type="submit"
                 form="checkout-form"
-                className="w-full h-14 mt-8" 
+                className="w-full h-14 mt-8 bg-foreground text-background hover:bg-foreground/80 transition-colors font-medium text-sm tracking-wide disabled:opacity-50 disabled:pointer-events-none"
                 disabled={isProcessing}
               >
                 {isProcessing ? "Processing..." : "Pay Now"}
-              </Button>
+              </button>
             </div>
           </div>
         </div>

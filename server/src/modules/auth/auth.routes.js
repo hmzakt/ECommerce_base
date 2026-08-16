@@ -88,4 +88,10 @@ router.get(
   asyncHandler(authController.me)
 );
 
+router.patch(
+  '/me',
+  authenticate,
+  asyncHandler(authController.updateProfile)
+);
+
 export const authRouter = router;

@@ -197,4 +197,33 @@ export const authController = {
       message: 'Verification email sent successfully.',
     });
   },
+
+  /**
+   * Update authenticated user's profile
+   */
+  updateProfile: async (req, res) => {
+    const { firstName, lastName, phone } = req.body;
+
+    const updatedUser = await userRepository.update(req.user.id, {
+      ...(firstName && { firstName: firstName.trim() }),
+      ...(lastName && { lastName: lastName.trim() }),
+      ...(phone !== undefined && { phone: phone?.trim() || null }),
+    });
+
+    sendSuccess(res, {
+      message: 'Profile updated successfully',
+      data: {
+        user: {
+          id: updatedUser.id,
+          firstName: updatedUser.firstName,
+          lastName: updatedUser.lastName,
+          email: updatedUser.email,
+          phone: updatedUser.phone,
+          role: updatedUser.role,
+          isEmailVerified: updatedUser.isEmailVerified,
+          createdAt: updatedUser.createdAt,
+        },
+      },
+    });
+  },
 };

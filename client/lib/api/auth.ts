@@ -88,3 +88,14 @@ export async function verifyEmailApi(token: string): Promise<void> {
 export async function resendVerificationApi(accessToken: string): Promise<void> {
   await authRequest("/auth/resend-verification", { accessToken });
 }
+
+export async function updateProfileApi(
+  accessToken: string,
+  data: { firstName?: string; lastName?: string; phone?: string | null }
+): Promise<{ user: User }> {
+  return authRequest<{ user: User }>("/auth/me", {
+    method: "PATCH",
+    accessToken,
+    body: data,
+  });
+}

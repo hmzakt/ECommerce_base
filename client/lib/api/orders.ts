@@ -1,5 +1,15 @@
 import { API_BASE_URL, ApiClientError } from "@/lib/api/client";
 
+export interface OrderItem {
+  id: string;
+  productId: string;
+  productName: string;
+  productSku: string;
+  unitPrice: string;
+  quantity: number;
+  lineTotal: string;
+}
+
 export interface ShippingAddress {
   fullName: string;
   streetAddress: string;
@@ -13,17 +23,18 @@ export interface ShippingAddress {
 
 export interface Order {
   id: string;
+  orderNumber: string;
   userId: string;
   status: "PENDING" | "CONFIRMED" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED";
   paymentStatus: "PENDING" | "PAID" | "FAILED" | "REFUNDED";
-  subtotal: number;
-  tax: number;
-  shipping: number;
-  total: number;
-  shippingAddress: ShippingAddress;
+  subtotal: string;
+  shippingCost: string;
+  tax: string;
+  total: string;
+  shippingAddress: ShippingAddress | null;
+  items: OrderItem[];
   createdAt: string;
   updatedAt: string;
-  // Note: order items can also be included here if the backend returns them
 }
 
 async function orderRequest<T>(
@@ -69,5 +80,58 @@ export async function checkoutApi(
   return orderRequest<{ order: Order }>("/checkout", {
     accessToken,
     body: { shippingAddress },
+  });
+}
+
+export interface OrderListMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export async function getOrdersApi(
+  accessToken: string,
+  params?: { page?: number; limit?: number; status?: string }
+): Promise<{ orders: Order[]; meta: OrderListMeta }> {
+  const query = new URLSearchParams();
+  if (params?.page) query.set("page", String(params.page));
+  if (params?.limit) query.set("limit", String(params.limit));
+  if (params?.status) query.set("status", params.status);
+  const qs = query.toString() ? `?${query.toString()}` : "";
+
+  return orderRequest<{ orders: Order[]; meta: OrderListMeta }>(`/orders${qs}`, {
+    method: "GET",
+    accessToken,
+  });
+}
+
+export async function getOrderByIdApi(
+  accessToken: string,
+  orderId: string
+): Promise<{ order: Order }> {
+  return orderRequest<{ order: Order }>(`/orders/${orderId}`, {
+    method: "GET",
+    accessToken,
+  });
+}
+
+export async function cancelOrderApi(
+  accessToken: string,
+  orderId: string
+): Promise<{ order: Order }> {
+  return orderRequest<{ order: Order }>(`/orders/${orderId}/cancel`, {
+    method: "PATCH",
+    accessToken,
+  });
+}
+
+export async function getShippingDetailsApi(
+  accessToken: string,
+  orderId: string
+): Promise<{ shipping: { trackingNumber: string | null; shippingProvider: string | null; status: string; estimatedDelivery: string | null } }> {
+  return orderRequest(`/orders/${orderId}/shipping`, {
+    method: "GET",
+    accessToken,
   });
 }
