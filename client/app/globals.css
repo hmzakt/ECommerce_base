@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+/* ── Light Theme (default) ─────────────────────────────────────────────────── */
 :root {
   --background: #faf8f5;
   --foreground: #1a1a1a;
@@ -14,6 +15,34 @@
   --container-max: 1440px;
   --section-gap: clamp(4rem, 8vw, 7rem);
   --header-height: 4.5rem;
+}
+
+/* ── Dark Theme ────────────────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --background: #0e0d0c;
+  --foreground: #f5f2ed;
+  --muted: #1c1a17;
+  --muted-foreground: #8a847c;
+  --border: #2a2520;
+  --surface: #141210;
+  --accent: #f5f2ed;
+  --accent-foreground: #0e0d0c;
+  --ring: #f5f2ed;
+}
+
+/* ── Fallback: honour OS preference until JS hydrates ──────────────────────── */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: #0e0d0c;
+    --foreground: #f5f2ed;
+    --muted: #1c1a17;
+    --muted-foreground: #8a847c;
+    --border: #2a2520;
+    --surface: #141210;
+    --accent: #f5f2ed;
+    --accent-foreground: #0e0d0c;
+    --ring: #f5f2ed;
+  }
 }
 
 @theme inline {

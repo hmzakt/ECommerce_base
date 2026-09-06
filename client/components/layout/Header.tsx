@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Container } from "@/components/ui/Container";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useCart } from "@/lib/context/CartContext";
@@ -18,7 +19,7 @@ const navLinks = [
 export function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, user, logout } = useAuth();
   const { totalItems } = useCart();
 
   useEffect(() => {
@@ -95,7 +96,7 @@ export function Header() {
               ))}
             </ul>
 
-            <div className="flex items-center gap-5">
+            <div className="flex items-center gap-4 sm:gap-5">
               <Link
                 href="/search"
                 className="text-eyebrow hidden sm:inline text-foreground transition-opacity hover:opacity-60"
@@ -104,6 +105,14 @@ export function Header() {
               </Link>
               {isAuthenticated ? (
                 <>
+                  {user?.role === "SUPER_ADMIN" && (
+                    <Link
+                      href="/admin"
+                      className="text-eyebrow hidden sm:inline text-foreground transition-opacity hover:opacity-60"
+                    >
+                      Admin
+                    </Link>
+                  )}
                   <Link
                     href="/account"
                     className="text-eyebrow hidden sm:inline text-foreground transition-opacity hover:opacity-60"
@@ -132,6 +141,7 @@ export function Header() {
               >
                 Cart ({totalItems})
               </Link>
+              <ThemeToggle />
             </div>
           </div>
         </Container>
@@ -148,7 +158,7 @@ export function Header() {
         aria-hidden={!menuOpen}
       >
         <nav
-          className="flex h-full flex-col justify-center px-8"
+          className="flex h-full flex-col justify-between px-8 py-24"
           aria-label="Mobile navigation"
         >
           <ul className="space-y-6">
@@ -172,6 +182,49 @@ export function Header() {
               </li>
             ))}
           </ul>
+
+          {/* Mobile bottom actions: Theme toggle, search, account/login, cart */}
+          <div className="border-t border-border pt-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <ThemeToggle showLabel />
+              <Link
+                href="/cart"
+                onClick={() => setMenuOpen(false)}
+                className="text-eyebrow text-foreground"
+              >
+                Cart ({totalItems})
+              </Link>
+            </div>
+            <div className="flex flex-wrap gap-4 text-eyebrow text-muted-foreground">
+              <Link href="/search" onClick={() => setMenuOpen(false)}>
+                Search
+              </Link>
+              {isAuthenticated ? (
+                <>
+                  <Link href="/account" onClick={() => setMenuOpen(false)}>
+                    Account
+                  </Link>
+                  {user?.role === "SUPER_ADMIN" && (
+                    <Link href="/admin" onClick={() => setMenuOpen(false)}>
+                      Admin
+                    </Link>
+                  )}
+                  <button
+                    onClick={() => {
+                      logout();
+                      setMenuOpen(false);
+                    }}
+                  >
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <Link href="/login" onClick={() => setMenuOpen(false)}>
+                  Login
+                </Link>
+              )}
+            </div>
+          </div>
         </nav>
       </div>
     </>

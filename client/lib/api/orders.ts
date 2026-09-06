@@ -130,7 +130,7 @@ export async function cancelOrderApi(
 export async function getShippingDetailsApi(
   accessToken: string,
   orderId: string
-): Promise<{ shipping: { trackingNumber: string | null; shippingProvider: string | null; status: string; estimatedDelivery: string | null } }> {
+): Promise<{ shipping: { id?: string; trackingNumber: string | null; shippingProvider: string | null; status: string; estimatedDelivery: string | null } }> {
   return orderRequest(`/orders/${orderId}/shipping`, {
     method: "GET",
     accessToken,
