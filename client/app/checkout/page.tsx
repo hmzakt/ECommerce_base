@@ -10,6 +10,7 @@ import { useCart } from "@/lib/context/CartContext";
 import { checkoutApi, ShippingAddress } from "@/lib/api/orders";
 import { createPaymentOrderApi, verifyPaymentApi } from "@/lib/api/payments";
 import { useRazorpay } from "@/components/checkout/RazorpayScript";
+import { ApiClientError } from "@/lib/api/client";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -30,17 +31,22 @@ export default function CheckoutPage() {
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({
       ...prev,
       [e.target.name]: e.target.value,
     }));
+    if (fieldErrors[e.target.name]) {
+      setFieldErrors((prev) => ({ ...prev, [e.target.name]: "" }));
+    }
   };
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setFieldErrors({});
 
     if (!isAuthenticated || !accessToken) {
       router.push("/login?redirect=/checkout");
@@ -63,12 +69,12 @@ export default function CheckoutPage() {
 
       // 3. Configure Razorpay Widget
       const options = {
-        key: paymentOrder.key_id || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_dummy",
+        key: paymentOrder.keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_dummy",
         amount: paymentOrder.amount,
         currency: paymentOrder.currency,
         name: "Maison",
         description: `Order ${order.id}`,
-        order_id: paymentOrder.order_id,
+        order_id: paymentOrder.razorpayOrderId,
         handler: async function (response: any) {
           try {
             // 4. Verify Payment
@@ -105,7 +111,18 @@ export default function CheckoutPage() {
 
       rzp.open();
     } catch (err: any) {
-      setError(err.message || "An unexpected error occurred during checkout.");
+      if (err instanceof ApiClientError && err.errors && err.errors.length > 0) {
+        const errorsMap: Record<string, string> = {};
+        err.errors.forEach((e) => {
+          const parts = e.field.split(".");
+          const fieldName = parts[parts.length - 1];
+          errorsMap[fieldName] = e.message;
+        });
+        setFieldErrors(errorsMap);
+        setError("Please correct the errors below.");
+      } else {
+        setError(err.message || "An unexpected error occurred during checkout.");
+      }
       setIsProcessing(false);
     }
   };
@@ -155,8 +172,9 @@ export default function CheckoutPage() {
                     required
                     value={formData.fullName}
                     onChange={handleChange}
-                    className="w-full border border-border px-4 py-3 focus:outline-none focus:ring-1 focus:ring-foreground bg-transparent"
+                    className={`w-full border px-4 py-3 focus:outline-none focus:ring-1 focus:ring-foreground bg-transparent ${fieldErrors.fullName ? "border-red-500" : "border-border"}`}
                   />
+                  {fieldErrors.fullName && <p className="text-red-500 text-sm mt-1">{fieldErrors.fullName}</p>}
                 </div>
 
                 <div>
@@ -168,9 +186,10 @@ export default function CheckoutPage() {
                     required
                     value={formData.streetAddress}
                     onChange={handleChange}
-                    className="w-full border border-border px-4 py-3 focus:outline-none focus:ring-1 focus:ring-foreground bg-transparent"
+                    className={`w-full border px-4 py-3 focus:outline-none focus:ring-1 focus:ring-foreground bg-transparent ${fieldErrors.streetAddress ? "border-red-500" : "border-border"}`}
                     placeholder="House number and street name"
                   />
+                  {fieldErrors.streetAddress && <p className="text-red-500 text-sm mt-1">{fieldErrors.streetAddress}</p>}
                 </div>
 
                 <div>
@@ -181,8 +200,9 @@ export default function CheckoutPage() {
                     name="apartment"
                     value={formData.apartment || ""}
                     onChange={handleChange}
-                    className="w-full border border-border px-4 py-3 focus:outline-none focus:ring-1 focus:ring-foreground bg-transparent"
+                    className={`w-full border px-4 py-3 focus:outline-none focus:ring-1 focus:ring-foreground bg-transparent ${fieldErrors.apartment ? "border-red-500" : "border-border"}`}
                   />
+                  {fieldErrors.apartment && <p className="text-red-500 text-sm mt-1">{fieldErrors.apartment}</p>}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -195,8 +215,9 @@ export default function CheckoutPage() {
                       required
                       value={formData.city}
                       onChange={handleChange}
-                      className="w-full border border-border px-4 py-3 focus:outline-none focus:ring-1 focus:ring-foreground bg-transparent"
+                      className={`w-full border px-4 py-3 focus:outline-none focus:ring-1 focus:ring-foreground bg-transparent ${fieldErrors.city ? "border-red-500" : "border-border"}`}
                     />
+                    {fieldErrors.city && <p className="text-red-500 text-sm mt-1">{fieldErrors.city}</p>}
                   </div>
                   <div>
                     <label htmlFor="state" className="block text-sm font-medium mb-2">State / Province</label>
@@ -207,8 +228,9 @@ export default function CheckoutPage() {
                       required
                       value={formData.state}
                       onChange={handleChange}
-                      className="w-full border border-border px-4 py-3 focus:outline-none focus:ring-1 focus:ring-foreground bg-transparent"
+                      className={`w-full border px-4 py-3 focus:outline-none focus:ring-1 focus:ring-foreground bg-transparent ${fieldErrors.state ? "border-red-500" : "border-border"}`}
                     />
+                    {fieldErrors.state && <p className="text-red-500 text-sm mt-1">{fieldErrors.state}</p>}
                   </div>
                 </div>
 
@@ -222,8 +244,9 @@ export default function CheckoutPage() {
                       required
                       value={formData.postalCode}
                       onChange={handleChange}
-                      className="w-full border border-border px-4 py-3 focus:outline-none focus:ring-1 focus:ring-foreground bg-transparent"
+                      className={`w-full border px-4 py-3 focus:outline-none focus:ring-1 focus:ring-foreground bg-transparent ${fieldErrors.postalCode ? "border-red-500" : "border-border"}`}
                     />
+                    {fieldErrors.postalCode && <p className="text-red-500 text-sm mt-1">{fieldErrors.postalCode}</p>}
                   </div>
                   <div>
                     <label htmlFor="country" className="block text-sm font-medium mb-2">Country</label>
@@ -234,8 +257,9 @@ export default function CheckoutPage() {
                       required
                       value={formData.country}
                       onChange={handleChange}
-                      className="w-full border border-border px-4 py-3 focus:outline-none focus:ring-1 focus:ring-foreground bg-transparent"
+                      className={`w-full border px-4 py-3 focus:outline-none focus:ring-1 focus:ring-foreground bg-transparent ${fieldErrors.country ? "border-red-500" : "border-border"}`}
                     />
+                    {fieldErrors.country && <p className="text-red-500 text-sm mt-1">{fieldErrors.country}</p>}
                   </div>
                 </div>
 
@@ -248,8 +272,9 @@ export default function CheckoutPage() {
                     required
                     value={formData.phone}
                     onChange={handleChange}
-                    className="w-full border border-border px-4 py-3 focus:outline-none focus:ring-1 focus:ring-foreground bg-transparent"
+                    className={`w-full border px-4 py-3 focus:outline-none focus:ring-1 focus:ring-foreground bg-transparent ${fieldErrors.phone ? "border-red-500" : "border-border"}`}
                   />
+                  {fieldErrors.phone && <p className="text-red-500 text-sm mt-1">{fieldErrors.phone}</p>}
                 </div>
               </form>
             </div>

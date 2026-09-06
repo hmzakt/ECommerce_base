@@ -1,10 +1,12 @@
 import { API_BASE_URL, ApiClientError } from "@/lib/api/client";
 
 export interface PaymentOrderResponse {
-  order_id: string; // Razorpay Order ID
+  paymentId: string;
+  razorpayOrderId: string;
   amount: number;
   currency: string;
-  key_id: string; // Razorpay Key ID
+  keyId: string;
+  orderNumber: string;
 }
 
 export interface VerifyPaymentPayload {

@@ -6,12 +6,14 @@ const API_BASE_URL =
 export class ApiClientError extends Error {
   status: number;
   code?: string;
+  errors?: Array<{ field: string; message: string }>;
 
-  constructor(message: string, status: number, code?: string) {
+  constructor(message: string, status: number, code?: string, errors?: Array<{ field: string; message: string }>) {
     super(message);
     this.name = "ApiClientError";
     this.status = status;
     this.code = code;
+    this.errors = errors;
   }
 }
 
@@ -60,8 +62,10 @@ export async function apiRequest<T>(
       "message" in payload ? payload.message : "Request failed";
     const code =
       "error" in payload && payload.error?.code ? payload.error.code : undefined;
+    const errors =
+      "errors" in payload ? (payload.errors as Array<{ field: string; message: string }>) : undefined;
 
-    throw new ApiClientError(message, response.status, code);
+    throw new ApiClientError(message, response.status, code, errors);
   }
 
   return (payload as ApiResponse<T>).data;

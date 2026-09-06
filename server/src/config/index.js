@@ -127,5 +127,3 @@ export const config = Object.freeze({
 cloudinary.config({
   secure: true
 });
-
-console.log(cloudinary.config());

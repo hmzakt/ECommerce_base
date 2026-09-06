@@ -29,9 +29,9 @@ const startServer = async () => {
   // ── 1. Verify database connectivity ──────────────────────────────────────────
   try {
     await prisma.$connect();
-    logger.info('✅ Database connected successfully');
+    logger.info('Database connected successfully');
   } catch (error) {
-    logger.fatal({ err: error }, '❌ Failed to connect to database. Aborting startup.');
+    logger.fatal({ err: error }, 'Failed to connect to database. Aborting startup.');
     process.exit(1);
   }
 

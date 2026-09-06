@@ -67,7 +67,8 @@ async function orderRequest<T>(
   if (!response.ok || !payload.success) {
     const message = payload.message ?? "Request failed";
     const code = payload.error?.code;
-    throw new ApiClientError(message, response.status, code);
+    const errors = payload.errors;
+    throw new ApiClientError(message, response.status, code, errors);
   }
 
   return payload.data;
