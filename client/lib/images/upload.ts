@@ -36,6 +36,7 @@ export interface UploadedImage {
 export interface ImageUploadOptions {
   folder?: string;
   signal?: AbortSignal;
+  accessToken?: string;
 }
 
 export class ImageUploadError extends Error {
@@ -59,8 +60,14 @@ export async function uploadImage(
     formData.append("folder", options.folder);
   }
 
+  const headers: Record<string, string> = {};
+  if (options.accessToken) {
+    headers["Authorization"] = `Bearer ${options.accessToken}`;
+  }
+
   const response = await fetch(`${API_BASE_URL}/admin/uploads/image`, {
     method: "POST",
+    headers,
     body: formData,
     signal: options.signal,
     credentials: "include",

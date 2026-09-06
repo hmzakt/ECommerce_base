@@ -55,7 +55,7 @@ const envSchema = z.object({
 const parseResult = envSchema.safeParse(process.env);
 
 if (!parseResult.success) {
-  console.error('❌ Invalid environment configuration:\n');
+  console.error(' Invalid environment configuration:\n');
   parseResult.error.errors.forEach((err) => {
     console.error(`  ${err.path.join('.')}: ${err.message}`);
   });
@@ -104,7 +104,7 @@ export const config = Object.freeze({
       secure: env.NODE_ENV === 'production',
       sameSite: env.NODE_ENV === 'production' ? 'strict' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
-      path: '/auth/refresh', // Restrict refresh cookie to refresh endpoint only
+      path: '/api/v1/auth/refresh',
     }),
   }),
 

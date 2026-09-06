@@ -47,7 +47,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Hydrate from localStorage on mount
+  // Hydrate from localStorage on mount.
+  // Strategy:
+  //  1. Try the stored access token with /auth/me.
+  //  2. If that fails (token expired/invalid), attempt a silent refresh using
+  //     the httpOnly refresh cookie — refreshTokenApi needs NO token arg.
+  //  3. Only clear the session if the refresh cookie is also gone/expired.
   useEffect(() => {
     const stored = localStorage.getItem(TOKEN_KEY);
     if (!stored) {
@@ -62,14 +67,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(u);
       })
       .catch(async () => {
-        // Try refresh
+        // Access token stale — try silent refresh via httpOnly cookie.
+        // We pass the old token so the backend can extract userId (it ignores expiry for this).
         try {
           const { accessToken: newToken } = await refreshTokenApi(stored);
           saveToken(newToken);
           const { user: u } = await getMeApi(newToken);
           setUser(u);
         } catch {
-          // Fully expired
+          // Both tokens expired — clear local state.
           saveToken(null);
           setUser(null);
         }

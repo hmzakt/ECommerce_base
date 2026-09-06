@@ -79,7 +79,8 @@ export const productController = {
     };
 
     const { products, total } = await productService.getProducts(filters);
-    const { page, limit } = filters;
+    const page = Number(filters.page) || 1;
+    const limit = Number(filters.limit) || 20;
 
     sendSuccess(res, {
       message: 'Products retrieved successfully',
@@ -94,7 +95,8 @@ export const productController = {
    */
   getAdminProducts: async (req, res) => {
     const { products, total } = await productService.getProducts(req.query);
-    const { page, limit } = req.query;
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 15;
 
     sendSuccess(res, {
       message: 'Products retrieved successfully',

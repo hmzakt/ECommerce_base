@@ -29,7 +29,13 @@ async function adminRequest<T>(
     throw new ApiClientError(message, response.status, code);
   }
 
-  return payload.data;
+  // The backend envelope is { success, data, meta }
+  // Merge meta into the returned object so paginated endpoints expose it.
+  if (payload.meta !== undefined) {
+    return { ...payload.data, meta: payload.meta } as T;
+  }
+
+  return payload.data as T;
 }
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -307,3 +313,6 @@ export async function updateShippingAdminApi(
 ): Promise<{ shipping: any }> {
   return adminRequest(`/admin/shipping/${shippingId}`, { method: "PATCH", body: data, accessToken: token });
 }
+
+// ─── Uploads (Cloudinary) ──────────────────────────────────────────────────────
+export { uploadImage, type UploadedImage, ImageUploadError } from "@/lib/images/upload";

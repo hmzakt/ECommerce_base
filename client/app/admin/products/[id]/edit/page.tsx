@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/context/AuthContext";
 import { getAdminProductsApi, updateProductApi, getAdminCategoriesApi, AdminProduct, AdminCategory } from "@/lib/api/admin";
+import { ProductImageManager } from "@/components/admin/ProductImageManager";
 
 export default function EditProductPage() {
   const { id } = useParams<{ id: string }>();
@@ -184,26 +185,12 @@ export default function EditProductPage() {
           </div>
         </section>
 
-        <section className="bg-white/5 border border-white/8 rounded-xl p-6 space-y-4">
-          <h2 className="text-sm font-medium text-white/70 uppercase tracking-wider">Images</h2>
-          {form.images.map((img: any, index: number) => (
-            <div key={index} className="flex gap-3">
-              <div className="flex-1 space-y-2">
-                <input value={img.url} onChange={(e) => handleImageChange(index, "url", e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-white/20" placeholder="Image URL" />
-                <input value={img.alt} onChange={(e) => handleImageChange(index, "alt", e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-white/20" placeholder="Alt text" />
-              </div>
-              {form.images.length > 1 && (
-                <button type="button" onClick={() => setForm((p: any) => ({ ...p, images: p.images.filter((_: any, i: number) => i !== index) }))} className="text-red-400/60 hover:text-red-400 mt-2">✕</button>
-              )}
-            </div>
-          ))}
-          <button type="button" onClick={() => setForm((p: any) => ({ ...p, images: [...p.images, { url: "", alt: "" }] }))}
-            className="text-sm text-white/40 hover:text-white border border-white/10 rounded-lg px-4 py-2 hover:bg-white/5 transition-colors">
-            + Add Image
-          </button>
-        </section>
+        {/* Images (Local Upload to Cloudinary & URL Support) */}
+        <ProductImageManager
+          images={form.images}
+          onChange={(images) => setForm((p: any) => ({ ...p, images }))}
+          accessToken={accessToken}
+        />
 
         <section className="bg-white/5 border border-white/8 rounded-xl p-6 space-y-4">
           <h2 className="text-sm font-medium text-white/70 uppercase tracking-wider">Settings</h2>

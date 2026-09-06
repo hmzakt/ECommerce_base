@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
 import { createProductApi, getAdminCategoriesApi, AdminCategory } from "@/lib/api/admin";
+import { ProductImageManager } from "@/components/admin/ProductImageManager";
 
 const EMPTY_FORM = {
   name: "", sku: "", brand: "", price: "", compareAtPrice: "", costPrice: "",
@@ -67,8 +68,8 @@ export default function NewProductPage() {
         compareAtPrice: form.compareAtPrice ? Number(form.compareAtPrice) : null,
         costPrice: form.costPrice ? Number(form.costPrice) : null,
         categoryId: form.categoryId,
-        shortDescription: form.shortDescription || null,
-        description: form.description || null,
+        shortDescription: form.shortDescription || undefined,
+        description: form.description || undefined,
         isActive: form.isActive,
         isFeatured: form.isFeatured,
         images: form.images.filter((img) => img.url.trim()).map((img) => ({
@@ -200,35 +201,12 @@ export default function NewProductPage() {
           </div>
         </section>
 
-        {/* Images */}
-        <section className="bg-white/5 border border-white/8 rounded-xl p-6 space-y-4">
-          <h2 className="text-sm font-medium text-white/70 uppercase tracking-wider">Images (URLs)</h2>
-          {form.images.map((img, index) => (
-            <div key={index} className="flex gap-3 items-start">
-              <div className="flex-1 space-y-2">
-                <input
-                  value={img.url} onChange={(e) => handleImageChange(index, "url", e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:ring-1 focus:ring-white/20"
-                  placeholder="https://example.com/image.jpg"
-                />
-                <input
-                  value={img.alt} onChange={(e) => handleImageChange(index, "alt", e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:ring-1 focus:ring-white/20"
-                  placeholder="Alt text (optional)"
-                />
-              </div>
-              {form.images.length > 1 && (
-                <button type="button" onClick={() => removeImage(index)} className="text-red-400/60 hover:text-red-400 mt-2">✕</button>
-              )}
-            </div>
-          ))}
-          <button
-            type="button" onClick={addImage}
-            className="text-sm text-white/40 hover:text-white border border-white/10 rounded-lg px-4 py-2 hover:bg-white/5 transition-colors"
-          >
-            + Add Image
-          </button>
-        </section>
+        {/* Images (Local Upload to Cloudinary & URL Support) */}
+        <ProductImageManager
+          images={form.images}
+          onChange={(images) => setForm((p) => ({ ...p, images }))}
+          accessToken={accessToken}
+        />
 
         {/* Status */}
         <section className="bg-white/5 border border-white/8 rounded-xl p-6 space-y-4">

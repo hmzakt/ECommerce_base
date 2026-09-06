@@ -83,5 +83,9 @@ router.use('/admin/shipping', adminShippingRouter); // PATCH /admin/shipping/:id
 import { dashboardRouter } from '../modules/dashboard/routes/dashboard.routes.js';
 router.use('/admin/dashboard', dashboardRouter);
 
+// Admin Uploads Module (Cloudinary)
+import { adminUploadRouter } from '../modules/uploads/upload.routes.js';
+router.use('/admin/uploads', adminUploadRouter);
+
 export default router;
 

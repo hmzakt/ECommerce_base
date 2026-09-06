@@ -1,15 +1,6 @@
 /**
  * HTTP Server Entry Point
  *
- * Responsibilities:
- *  1. Create the Express app via the factory function
- *  2. Connect to the database (verify Prisma can reach Neon DB)
- *  3. Start the HTTP server
- *  4. Handle graceful shutdown on SIGTERM and SIGINT:
- *     - Stop accepting new connections
- *     - Allow in-flight requests to complete (up to timeout)
- *     - Disconnect Prisma
- *     - Exit cleanly
  *
  * Why graceful shutdown?
  *   In Kubernetes/Docker environments, the orchestrator sends SIGTERM before

@@ -52,11 +52,12 @@ export async function registerApi(
   return authRequest<AuthResponse>("/auth/register", { body: payload });
 }
 
-export async function refreshTokenApi(
-  accessToken: string,
-): Promise<{ accessToken: string }> {
+export async function refreshTokenApi(expiredAccessToken: string): Promise<{ accessToken: string }> {
+  // The backend needs the expired access token to identify the user (userId extraction).
+  // The refresh cookie is sent automatically via credentials:"include".
   return authRequest<{ accessToken: string }>("/auth/refresh", {
-    accessToken,
+    method: "POST",
+    accessToken: expiredAccessToken,
   });
 }
 
