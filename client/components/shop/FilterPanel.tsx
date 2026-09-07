@@ -78,11 +78,15 @@ export function FilterPanel({
       <div>
         <h3 className="text-eyebrow text-foreground mb-4">Sort By</h3>
         <select
-          value={currentSort}
+          value={currentSort || (searchParams.get("search") ? "relevance" : "")}
           onChange={(e) => handleFilterChange("sortBy", e.target.value)}
-          className="w-full border border-border bg-transparent px-4 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring appearance-none"
+          className="w-full border border-border bg-background px-4 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring appearance-none"
         >
-          <option value="">Featured</option>
+          {searchParams.get("search") ? (
+            <option value="relevance">Relevance</option>
+          ) : (
+            <option value="">Featured</option>
+          )}
           <option value="newest">Newest Arrivals</option>
           <option value="price_asc">Price: Low to High</option>
           <option value="price_desc">Price: High to Low</option>

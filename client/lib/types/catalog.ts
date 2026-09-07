@@ -49,6 +49,7 @@ export interface ProductListParams {
   brand?: string;
   featured?: boolean;
   sortBy?:
+    | "relevance"
     | "newest"
     | "oldest"
     | "price_asc"
