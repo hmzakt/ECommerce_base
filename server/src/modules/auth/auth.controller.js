@@ -95,7 +95,7 @@ export const authController = {
    */
   logout: async (req, res) => {
     // req.user is populated by the authenticate middleware
-    await authService.logout(req.user.id);
+    await authService.logout(req.user.userId);
 
     res.clearCookie(CookieNames.REFRESH_TOKEN, {
       ...config.cookies.refreshTokenOptions,
@@ -111,9 +111,9 @@ export const authController = {
    * Get current logged in user profile
    */
   me: async (req, res) => {
-    // req.user is populated by authenticate middleware, but it only contains id and role
+    // req.user is populated by authenticate middleware with userId and role
     // Fetch full profile from DB
-    const user = await userRepository.findById(req.user.id);
+    const user = await userRepository.findById(req.user.userId);
 
     if (!user) {
       throw AppError.notFound('User not found', ErrorCodes.USER_NOT_FOUND);
@@ -191,7 +191,7 @@ export const authController = {
    */
   resendVerificationEmail: async (req, res) => {
     // req.user is populated by authenticate middleware
-    await authService.resendVerificationEmail(req.user.id);
+    await authService.resendVerificationEmail(req.user.userId);
 
     sendSuccess(res, {
       message: 'Verification email sent successfully.',
@@ -204,7 +204,7 @@ export const authController = {
   updateProfile: async (req, res) => {
     const { firstName, lastName, phone } = req.body;
 
-    const updatedUser = await userRepository.update(req.user.id, {
+    const updatedUser = await userRepository.update(req.user.userId, {
       ...(firstName && { firstName: firstName.trim() }),
       ...(lastName && { lastName: lastName.trim() }),
       ...(phone !== undefined && { phone: phone?.trim() || null }),

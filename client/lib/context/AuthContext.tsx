@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type { User, LoginPayload, RegisterPayload } from "@/lib/types/auth";
@@ -36,6 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const hydrationStarted = useRef(false);
 
   // Persist token to localStorage
   const saveToken = useCallback((token: string | null) => {
@@ -54,6 +56,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   //     the httpOnly refresh cookie — refreshTokenApi needs NO token arg.
   //  3. Only clear the session if the refresh cookie is also gone/expired.
   useEffect(() => {
+    if (hydrationStarted.current) return;
+    hydrationStarted.current = true;
+
     const stored = localStorage.getItem(TOKEN_KEY);
     if (!stored) {
       setIsLoading(false);
@@ -74,7 +79,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           saveToken(newToken);
           const { user: u } = await getMeApi(newToken);
           setUser(u);
-        } catch {
+        } catch (error) {
+          console.error("Unable to restore the saved authentication session.", error);
           // Both tokens expired — clear local state.
           saveToken(null);
           setUser(null);

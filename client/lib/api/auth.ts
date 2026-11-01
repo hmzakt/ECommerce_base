@@ -6,6 +6,8 @@ interface AuthResponse {
   accessToken: string;
 }
 
+let refreshRequest: Promise<{ accessToken: string }> | null = null;
+
 async function authRequest<T>(
   path: string,
   options: {
@@ -55,10 +57,16 @@ export async function registerApi(
 export async function refreshTokenApi(expiredAccessToken: string): Promise<{ accessToken: string }> {
   // The backend needs the expired access token to identify the user (userId extraction).
   // The refresh cookie is sent automatically via credentials:"include".
-  return authRequest<{ accessToken: string }>("/auth/refresh", {
-    method: "POST",
-    accessToken: expiredAccessToken,
-  });
+  if (!refreshRequest) {
+    refreshRequest = authRequest<{ accessToken: string }>("/auth/refresh", {
+      method: "POST",
+      accessToken: expiredAccessToken,
+    }).finally(() => {
+      refreshRequest = null;
+    });
+  }
+
+  return refreshRequest;
 }
 
 export async function getMeApi(
