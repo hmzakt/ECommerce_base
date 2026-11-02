@@ -1,4 +1,5 @@
 import { shippingRepository } from '../repositories/shipping.repository.js';
+import { shipmentRepository } from '../repositories/shipment.repository.js';
 import { orderRepository } from '../../orders/repositories/order.repository.js';
 import { emailService } from '../../../common/email/email.service.js';
 import { AppError } from '../../../common/errors/AppError.js';
@@ -7,8 +8,8 @@ import { logger } from '../../../common/logger/index.js';
 
 export const shippingService = {
   /**
-   * Get shipping details for a specific order.
-   * Enforces customer ownership.
+   * Get shipping and real-time tracking details for a specific order.
+   * Enforces customer ownership and returns rich shipment events when available.
    *
    * @param {string} userId
    * @param {string} orderId
@@ -26,18 +27,37 @@ export const shippingService = {
       throw AppError.forbidden('You do not have permission to track this order.');
     }
 
-    // 2. Fetch shipping details
-    const shipping = await shippingRepository.findByOrderId(orderId);
-    if (!shipping) {
+    // 2. Look for rich logistics Shipment first
+    const shipment = await shipmentRepository.findActiveByOrderId(orderId);
+
+    // 3. Fallback to legacy shipping record
+    const legacyShipping = await shippingRepository.findByOrderId(orderId);
+
+    if (!shipment && !legacyShipping) {
       throw AppError.notFound('Shipping record not found for this order.', ErrorCodes.NOT_FOUND);
     }
 
-    return shipping;
+    return {
+      id: shipment?.id || legacyShipping?.id,
+      orderId,
+      status: shipment?.status || legacyShipping?.status,
+      shippingProvider: shipment?.courierName || shipment?.shippingProvider || legacyShipping?.shippingProvider,
+      courierName: shipment?.courierName || legacyShipping?.shippingProvider,
+      trackingNumber: shipment?.awbCode || legacyShipping?.trackingNumber,
+      awbCode: shipment?.awbCode || legacyShipping?.trackingNumber,
+      trackingUrl: shipment?.trackingUrl || (shipment?.awbCode ? `https://shiprocket.co/tracking/${shipment.awbCode}` : null),
+      estimatedDelivery: shipment?.estimatedDelivery || legacyShipping?.estimatedDelivery,
+      actualDelivery: shipment?.actualDelivery || legacyShipping?.actualDelivery,
+      labelUrl: shipment?.labelUrl || null,
+      events: shipment?.events || [],
+      destination: order.shippingAddress,
+      createdAt: shipment?.createdAt || legacyShipping?.createdAt,
+      updatedAt: shipment?.updatedAt || legacyShipping?.updatedAt,
+    };
   },
 
   /**
-   * Update shipping details (Admin only).
-   * Triggers an asynchronous email status update to the customer if status is updated.
+   * Update shipping details (Admin only legacy endpoint).
    *
    * @param {string} id - Shipping ID
    * @param {object} updateData
@@ -48,7 +68,6 @@ export const shippingService = {
       throw AppError.notFound('Shipping record not found', ErrorCodes.NOT_FOUND);
     }
 
-    // Update estimatedDelivery and actualDelivery safely
     const formattedData = { ...updateData };
     if (updateData.estimatedDelivery) formattedData.estimatedDelivery = new Date(updateData.estimatedDelivery);
     if (updateData.actualDelivery) formattedData.actualDelivery = new Date(updateData.actualDelivery);
@@ -60,8 +79,7 @@ export const shippingService = {
       'Shipping details updated by Admin'
     );
 
-    // If status has changed, notify customer asynchronously
-    if (existing.status !== updated.status) {
+    if (existing.status !== updated.status && updated.order?.user?.email) {
       const email = updated.order.user.email;
       const orderNumber = updated.order.orderNumber;
       await emailService.sendShippingUpdate(email, updated, orderNumber);

@@ -116,6 +116,10 @@ model Product {
   categoryId       String         @map("category_id") @db.Uuid
   isActive         Boolean        @default(true) @map("is_active")
   isFeatured       Boolean        @default(false) @map("is_featured")
+  weight           Decimal?       @db.Decimal(10, 3)
+  length           Decimal?       @db.Decimal(10, 2)
+  breadth          Decimal?       @db.Decimal(10, 2)
+  height           Decimal?       @db.Decimal(10, 2)
   createdAt        DateTime       @default(now()) @map("created_at")
   updatedAt        DateTime       @updatedAt @map("updated_at")
   category         Category       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
@@ -232,7 +236,9 @@ model Order {
   items           OrderItem[]
   shippingAddress ShippingAddress?
   payment         Payment?
-  shipping        Shipping?
+  shipping        Shipping?         // Legacy shipping record
+  shipments       Shipment[]        // Full logistics shipments
+  shippingAttempts ShippingAttempt[] // Audited shipping operations
 
   @@map("orders")
   @@index([userId])
@@ -346,4 +352,189 @@ model Shipping {
   @@index([orderId])
   @@index([status])
 }
+
+// ────────────────────────────────────────────────────────────────────────────────
+// Production Logistics Domain Models (Phase 1)
+// ────────────────────────────────────────────────────────────────────────────────
+
+enum ShipmentStatus {
+  PENDING
+  PROCESSING
+  SHIPMENT_CREATED
+  AWB_ASSIGNED
+  PICKUP_REQUESTED
+  PICKED_UP
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  DELIVERY_FAILED
+  RTO_INITIATED
+  RTO_DELIVERED
+  CANCELLED
+  EXCEPTION
+}
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+  DEAD_LETTER
+}
+
+// ── Shipment Model ─────────────────────────────────────────────────────────────
+model Shipment {
+  id                  String            @id @default(uuid()) @db.Uuid
+  orderId             String            @map("order_id") @db.Uuid
+  shippingProvider    String            @default("SHIPROCKET") @map("shipping_provider")
+  courierName         String?           @map("courier_name")
+  courierCompanyId    Int?              @map("courier_company_id")
+  externalShipmentId  String?           @map("external_shipment_id")
+  externalOrderId     String?           @map("external_order_id")
+  awbCode             String?           @map("awb_code")
+  trackingUrl         String?           @map("tracking_url")
+  status              ShipmentStatus    @default(PENDING)
+  shippingCost        Decimal           @default(0.00) @map("shipping_cost") @db.Decimal(10, 2)
+  currency            String            @default("INR")
+  weight              Decimal           @default(0.500) @db.Decimal(10, 3) // Weight in kg
+  length              Decimal?          @db.Decimal(10, 2) // Dimensions in cm
+  breadth             Decimal?          @db.Decimal(10, 2)
+  height              Decimal?          @db.Decimal(10, 2)
+  pickupLocation      String?           @map("pickup_location")
+  destinationSnapshot Json?             @map("destination_snapshot")
+  estimatedDelivery   DateTime?         @map("estimated_delivery")
+  actualDelivery      DateTime?         @map("actual_delivery")
+  labelUrl            String?           @map("label_url")
+  manifestUrl         String?           @map("manifest_url")
+  invoiceUrl          String?           @map("invoice_url")
+  pickupRequestId     String?           @map("pickup_request_id")
+  pickupScheduledDate DateTime?         @map("pickup_scheduled_date")
+  selectionStrategy   String?           @map("selection_strategy")
+  selectionReason     String?           @map("selection_reason")
+  isActive            Boolean           @default(true) @map("is_active")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+
+  order               Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  events              ShipmentEvent[]
+  attempts            ShippingAttempt[]
+
+  @@map("shipments")
+  @@index([orderId])
+  @@index([awbCode])
+  @@index([status])
+  @@index([externalShipmentId])
+  @@index([isActive])
+  @@index([createdAt])
+}
+
+// ── ShipmentEvent Model ────────────────────────────────────────────────────────
+model ShipmentEvent {
+  id               String         @id @default(uuid()) @db.Uuid
+  shipmentId       String         @map("shipment_id") @db.Uuid
+  eventCode        String?        @map("event_code")
+  eventStatus      String         @map("event_status")
+  eventDescription String         @map("event_description")
+  eventLocation    String?        @map("event_location")
+  eventTimestamp   DateTime       @map("event_timestamp")
+  eventSource      String         @default("SYSTEM") @map("event_source") // SHIPROCKET, SYSTEM, ADMIN
+  externalEventId  String?        @map("external_event_id")
+  rawPayload       Json?          @map("raw_payload")
+  createdAt        DateTime       @default(now()) @map("created_at")
+
+  shipment         Shipment       @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@unique([shipmentId, externalEventId])
+  @@map("shipment_events")
+  @@index([shipmentId])
+  @@index([eventTimestamp])
+}
+
+// ── ShippingProvider Model ─────────────────────────────────────────────────────
+model ShippingProvider {
+  id                String   @id @default(uuid()) @db.Uuid
+  code              String   @unique // SHIPROCKET, DELHIVERY, EKART, INDIAPOST
+  name              String
+  providerType      String   @default("AGGREGATOR") @map("provider_type") // AGGREGATOR, DIRECT
+  isActive          Boolean  @default(true) @map("is_active")
+  environment       String   @default("SANDBOX") // SANDBOX, PRODUCTION
+  credentialsCipher String?  @map("credentials_cipher") // AES-256-GCM encrypted credentials
+  config            Json?    @default("{}")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("shipping_providers")
+  @@index([code])
+  @@index([isActive])
+}
+
+// ── ShippingSettings Model ─────────────────────────────────────────────────────
+model ShippingSettings {
+  id                       String   @id @default(uuid()) @db.Uuid
+  autoCreateShipment       Boolean  @default(true) @map("auto_create_shipment")
+  defaultProviderCode      String   @default("SHIPROCKET") @map("default_provider_code")
+  allowedCouriers          Json?    @map("allowed_couriers")
+  courierSelectionStrategy String   @default("BALANCED") @map("courier_selection_strategy") // CHEAPEST, FASTEST, BALANCED
+  strategyWeights          Json?    @map("strategy_weights")
+  preferredCourierId       String?  @map("preferred_courier_id")
+  freeShippingThreshold    Decimal  @default(0.00) @map("free_shipping_threshold") @db.Decimal(10, 2)
+  warehouseAddress         Json     @map("warehouse_address")
+  defaultPackageWeight     Decimal  @default(0.500) @map("default_package_weight") @db.Decimal(10, 3)
+  defaultPackageDimensions Json     @map("default_package_dimensions")
+  retryPolicy              Json     @map("retry_policy")
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @updatedAt @map("updated_at")
+
+  @@map("shipping_settings")
+}
+
+// ── ShippingAttempt Model ──────────────────────────────────────────────────────
+model ShippingAttempt {
+  id              String    @id @default(uuid()) @db.Uuid
+  orderId         String    @map("order_id") @db.Uuid
+  shipmentId      String?   @map("shipment_id") @db.Uuid
+  provider        String
+  operation       String    // CREATE_SHIPMENT, GENERATE_AWB, REQUEST_PICKUP, CANCEL_SHIPMENT, TRACK
+  attemptNumber   Int       @default(1) @map("attempt_number")
+  correlationId   String    @map("correlation_id")
+  status          String    // SUCCESS, FAILED
+  errorCode       String?   @map("error_code")
+  errorMessage    String?   @map("error_message")
+  requestPayload  Json?     @map("request_payload")
+  responsePayload Json?     @map("response_payload")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  order           Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  shipment        Shipment? @relation(fields: [shipmentId], references: [id], onDelete: SetNull)
+
+  @@map("shipping_attempts")
+  @@index([orderId])
+  @@index([shipmentId])
+  @@index([correlationId])
+  @@index([status])
+}
+
+// ── OutboxEvent Model (Transactional Outbox Pattern) ───────────────────────────
+model OutboxEvent {
+  id            String       @id @default(uuid()) @db.Uuid
+  eventType     String       @map("event_type") // ORDER_CONFIRMED_FOR_SHIPMENT, etc.
+  aggregateType String       @default("ORDER") @map("aggregate_type")
+  aggregateId   String       @map("aggregate_id")
+  payload       Json
+  status        OutboxStatus @default(PENDING)
+  retryCount    Int          @default(0) @map("retry_count")
+  maxRetries    Int          @default(5) @map("max_retries")
+  nextRetryAt   DateTime?    @map("next_retry_at")
+  lastError     String?      @map("last_error")
+  lockedAt      DateTime?    @map("locked_at")
+  lockedBy      String?      @map("locked_by")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  processedAt   DateTime?    @map("processed_at")
+
+  @@map("outbox_events")
+  @@index([status, nextRetryAt])
+  @@index([aggregateId])
+  @@index([createdAt])
+}
+
 

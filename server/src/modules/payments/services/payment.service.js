@@ -14,6 +14,7 @@ import { prisma } from '../../../prisma/client.js';
 import { AppError } from '../../../common/errors/AppError.js';
 import { ErrorCodes } from '../../../common/errors/errorCodes.js';
 import { logger } from '../../../common/logger/index.js';
+import { outboxService, OutboxEventTypes } from '../../shipping/services/outbox.service.js';
 
 // Initialize Razorpay SDK instance
 const razorpay = new Razorpay({
@@ -170,6 +171,13 @@ export const paymentService = {
         status: 'CONFIRMED',
       });
 
+      await outboxService.createEvent(tx, {
+        eventType: OutboxEventTypes.ORDER_CONFIRMED_FOR_SHIPMENT,
+        aggregateId: orderId,
+        aggregateType: 'ORDER',
+        payload: { orderId, paymentId: p.id, trigger: 'PAYMENT_VERIFIED' },
+      });
+
       return p;
     });
 
@@ -243,6 +251,13 @@ export const paymentService = {
         await orderRepository.updateOrderStatus(payment.orderId, {
           paymentStatus: 'PAID',
           status: 'CONFIRMED',
+        });
+
+        await outboxService.createEvent(tx, {
+          eventType: OutboxEventTypes.ORDER_CONFIRMED_FOR_SHIPMENT,
+          aggregateId: payment.orderId,
+          aggregateType: 'ORDER',
+          payload: { orderId: payment.orderId, trigger: 'WEBHOOK_PAYMENT_CAPTURED' },
         });
       });
 

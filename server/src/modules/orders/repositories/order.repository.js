@@ -42,6 +42,14 @@ const orderSelect = {
       unitPrice: true,
       quantity: true,
       lineTotal: true,
+      product: {
+        select: {
+          weight: true,
+          length: true,
+          breadth: true,
+          height: true,
+        },
+      },
     },
     orderBy: { createdAt: 'asc' },
   },

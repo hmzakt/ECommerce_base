@@ -86,6 +86,10 @@ export interface AdminProduct {
   images: { id: string; url: string; alt: string | null; displayOrder: number }[];
   shortDescription: string | null;
   description: string | null;
+  weight?: string | number | null;
+  length?: string | number | null;
+  breadth?: string | number | null;
+  height?: string | number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -166,6 +170,10 @@ export async function createProductApi(
     categoryId: string; shortDescription?: string; description?: string;
     compareAtPrice?: number | string | null; costPrice?: number | string | null;
     isActive?: boolean; isFeatured?: boolean;
+    weight?: number | string | null;
+    length?: number | string | null;
+    breadth?: number | string | null;
+    height?: number | string | null;
     images?: { url: string; alt?: string }[];
   }
 ): Promise<{ product: AdminProduct }> {
@@ -180,6 +188,10 @@ export async function updateProductApi(
     categoryId: string; shortDescription: string | null; description: string | null;
     compareAtPrice: number | string | null; costPrice: number | string | null;
     isActive: boolean; isFeatured: boolean;
+    weight: number | string | null;
+    length: number | string | null;
+    breadth: number | string | null;
+    height: number | string | null;
     images: { url: string; alt?: string }[];
   }>
 ): Promise<{ product: AdminProduct }> {

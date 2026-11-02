@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/context/AuthContext";
-import { getOrderByIdApi, cancelOrderApi, getShippingDetailsApi, Order } from "@/lib/api/orders";
+import { getOrderByIdApi, cancelOrderApi, Order } from "@/lib/api/orders";
+import { getShippingDetailsApi, CustomerShippingDetails } from "@/lib/api/shipping";
+import { TrackingTimeline } from "@/components/shipping/TrackingTimeline";
 import { ApiClientError } from "@/lib/api/client";
 
 const STATUS_STEPS = [
@@ -41,7 +43,7 @@ export default function OrderDetailPage() {
   const router = useRouter();
 
   const [order, setOrder] = useState<Order | null>(null);
-  const [shipping, setShipping] = useState<any>(null);
+  const [shipping, setShipping] = useState<CustomerShippingDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCancelling, setIsCancelling] = useState(false);
   const [error, setError] = useState("");
@@ -56,7 +58,8 @@ export default function OrderDetailPage() {
     ])
       .then(([{ order }, shippingData]) => {
         setOrder(order);
-        setShipping(shippingData?.shipping || null);
+        const details = (shippingData as any)?.shipping || shippingData;
+        setShipping(details?.id ? (details as CustomerShippingDetails) : null);
       })
       .catch(() => setError("Order not found."))
       .finally(() => setIsLoading(false));
@@ -267,35 +270,9 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
-      {/* Shipping / Tracking */}
+      {/* Shipping / Tracking Timeline */}
       {shipping && (
-        <div className="bg-surface p-6 shadow-sm">
-          <h3 className="text-sm font-medium uppercase tracking-wider text-muted-foreground mb-4">Shipping & Tracking</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div>
-              <p className="text-muted-foreground text-xs uppercase tracking-wider mb-1">Provider</p>
-              <p className="font-medium">{shipping.shippingProvider || "—"}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground text-xs uppercase tracking-wider mb-1">Tracking #</p>
-              <p className="font-medium font-mono">{shipping.trackingNumber || "—"}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground text-xs uppercase tracking-wider mb-1">Status</p>
-              <p className="font-medium">{SHIPPING_STATUS_LABELS[shipping.status] || shipping.status}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground text-xs uppercase tracking-wider mb-1">Est. Delivery</p>
-              <p className="font-medium">
-                {shipping.estimatedDelivery
-                  ? new Date(shipping.estimatedDelivery).toLocaleDateString("en-IN", {
-                      month: "short", day: "numeric", year: "numeric",
-                    })
-                  : "—"}
-              </p>
-            </div>
-          </div>
-        </div>
+        <TrackingTimeline shipping={shipping} />
       )}
     </div>
   );

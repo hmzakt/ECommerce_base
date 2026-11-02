@@ -46,6 +46,7 @@ export default function EditProductPage() {
           compareAtPrice: p.compareAtPrice || "", costPrice: p.costPrice || "",
           categoryId: p.categoryId, shortDescription: p.shortDescription || "",
           description: p.description || "", isActive: p.isActive, isFeatured: p.isFeatured,
+          weight: p.weight || "", length: p.length || "", breadth: p.breadth || "", height: p.height || "",
           images: p.images?.length > 0 ? p.images.map(img => ({ url: img.url, alt: img.alt || "" })) : [{ url: "", alt: "" }],
         });
       }
@@ -91,6 +92,10 @@ export default function EditProductPage() {
         shortDescription: form.shortDescription || null,
         description: form.description || null,
         isActive: form.isActive, isFeatured: form.isFeatured,
+        weight: form.weight ? Number(form.weight) : null,
+        length: form.length ? Number(form.length) : null,
+        breadth: form.breadth ? Number(form.breadth) : null,
+        height: form.height ? Number(form.height) : null,
         images: form.images.filter((img: any) => img.url.trim()).map((img: any) => ({
           url: img.url.trim(), alt: img.alt.trim() || undefined,
         })),
@@ -182,6 +187,59 @@ export default function EditProductPage() {
                 {errors[field as string] && <p className="text-red-400 text-xs mt-1">{errors[field as string]}</p>}
               </div>
             ))}
+          </div>
+        </section>
+
+        {/* Shipping & Packaging Dimensions */}
+        <section className="bg-white/5 border border-white/8 rounded-xl p-6 space-y-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-medium text-white/70 uppercase tracking-wider">Shipping & Packaging</h2>
+              <p className="text-xs text-white/40 mt-0.5">Physical package metrics used for automated courier rate and label calculation</p>
+            </div>
+            {(Number(form.length) > 0 && Number(form.breadth) > 0 && Number(form.height) > 0) && (
+              <div className="text-xs px-3 py-1 bg-white/5 border border-white/10 rounded-lg text-white/60">
+                Volumetric: <span className="text-white font-mono">{((Number(form.length) * Number(form.breadth) * Number(form.height)) / 5000).toFixed(2)} kg</span>
+              </div>
+            )}
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-xs text-white/40 mb-1.5">Weight (kg)</label>
+              <input
+                type="number" min="0" step="0.001"
+                value={form.weight || ""} onChange={(e) => handleChange("weight", e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-white/20"
+                placeholder="0.500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-white/40 mb-1.5">Length (cm)</label>
+              <input
+                type="number" min="0" step="0.1"
+                value={form.length || ""} onChange={(e) => handleChange("length", e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-white/20"
+                placeholder="10.0"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-white/40 mb-1.5">Breadth (cm)</label>
+              <input
+                type="number" min="0" step="0.1"
+                value={form.breadth || ""} onChange={(e) => handleChange("breadth", e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-white/20"
+                placeholder="10.0"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-white/40 mb-1.5">Height (cm)</label>
+              <input
+                type="number" min="0" step="0.1"
+                value={form.height || ""} onChange={(e) => handleChange("height", e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-white/20"
+                placeholder="10.0"
+              />
+            </div>
           </div>
         </section>
 

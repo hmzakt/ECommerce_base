@@ -5,7 +5,8 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/context/AuthContext";
 import { getAdminOrderByIdApi, updateOrderStatusAdminApi, updateShippingAdminApi, AdminOrder } from "@/lib/api/admin";
-import { getShippingDetailsApi } from "@/lib/api/orders";
+import { getShippingDetailsApi, CustomerShippingDetails } from "@/lib/api/shipping";
+import { OrderFulfillmentCard } from "@/components/admin/shipping/OrderFulfillmentCard";
 import { API_BASE_URL } from "@/lib/api/client";
 
 const ORDER_STATUSES = ["PENDING", "CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"];
@@ -27,7 +28,7 @@ export default function AdminOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { accessToken } = useAuth();
   const [order, setOrder] = useState<AdminOrder | null>(null);
-  const [shipping, setShipping] = useState<any>(null);
+  const [shipping, setShipping] = useState<CustomerShippingDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [statusForm, setStatusForm] = useState({ status: "", paymentStatus: "" });
   const [shippingForm, setShippingForm] = useState({ trackingNumber: "", shippingProvider: "", estimatedDelivery: "", status: "" });
@@ -47,16 +48,19 @@ export default function AdminOrderDetailPage() {
       ]);
       setOrder(o);
       setStatusForm({ status: o.status, paymentStatus: o.paymentStatus });
-      if (shippingData?.shipping) {
-        const s = shippingData.shipping;
-        setShipping(s);
-        setShippingId(s.id || null);
+      const details = (shippingData as any)?.shipping || shippingData;
+      if (details?.id) {
+        setShipping(details as CustomerShippingDetails);
+        setShippingId(details.id);
         setShippingForm({
-          trackingNumber: s.trackingNumber || "",
-          shippingProvider: s.shippingProvider || "",
-          estimatedDelivery: s.estimatedDelivery ? s.estimatedDelivery.slice(0, 10) : "",
-          status: s.status || "",
+          trackingNumber: details.trackingNumber || details.awbCode || "",
+          shippingProvider: details.shippingProvider || details.courierName || "",
+          estimatedDelivery: details.estimatedDelivery ? details.estimatedDelivery.slice(0, 10) : "",
+          status: details.status || "",
         });
+      } else {
+        setShipping(null);
+        setShippingId(null);
       }
     } catch (e) {
       console.error(e);
@@ -214,43 +218,14 @@ export default function AdminOrderDetailPage() {
             </button>
           </div>
 
-          {/* Shipping Update */}
-          {shippingId && (
-            <div className="bg-white/5 border border-white/8 rounded-xl p-6 space-y-4">
-              <h2 className="text-xs uppercase tracking-wider text-white/30">Shipping & Tracking</h2>
-              {shippingError && <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-lg p-3">{shippingError}</div>}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs text-white/40 mb-1.5">Tracking Number</label>
-                  <input value={shippingForm.trackingNumber} onChange={(e) => setShippingForm((p) => ({ ...p, trackingNumber: e.target.value }))}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-white/20"
-                    placeholder="e.g. DTDC1234567" />
-                </div>
-                <div>
-                  <label className="block text-xs text-white/40 mb-1.5">Shipping Provider</label>
-                  <input value={shippingForm.shippingProvider} onChange={(e) => setShippingForm((p) => ({ ...p, shippingProvider: e.target.value }))}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-white/20"
-                    placeholder="e.g. DTDC, Blue Dart" />
-                </div>
-                <div>
-                  <label className="block text-xs text-white/40 mb-1.5">Estimated Delivery</label>
-                  <input type="date" value={shippingForm.estimatedDelivery} onChange={(e) => setShippingForm((p) => ({ ...p, estimatedDelivery: e.target.value }))}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-white/20" />
-                </div>
-                <div>
-                  <label className="block text-xs text-white/40 mb-1.5">Shipping Status</label>
-                  <select value={shippingForm.status} onChange={(e) => setShippingForm((p) => ({ ...p, status: e.target.value }))}
-                    className="w-full bg-white/8 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-white/20">
-                    <option value="">Select</option>
-                    {SHIPPING_STATUSES.map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
-                  </select>
-                </div>
-              </div>
-              <button onClick={handleUpdateShipping} disabled={isSavingShipping}
-                className="px-5 py-2 bg-white text-[#0f0f0f] rounded-lg text-sm font-medium hover:bg-white/90 disabled:opacity-50">
-                {isSavingShipping ? "Saving..." : "Update Tracking"}
-              </button>
-            </div>
+          {/* Logistics & Fulfillment */}
+          {accessToken && (
+            <OrderFulfillmentCard
+              orderId={id}
+              shipping={shipping}
+              accessToken={accessToken}
+              onRefresh={fetchData}
+            />
           )}
         </div>
 

@@ -89,3 +89,56 @@ export const verifyEmailVerificationToken = (token) => {
   }
   return decoded;
 };
+
+/**
+ * Encrypt sensitive data using AES-256-GCM.
+ * Formats output as `iv:authTag:encryptedHex`.
+ *
+ * @param {string|object} data
+ * @param {string} [key]
+ * @returns {string}
+ */
+export const encryptData = (data, key = config.cookies.secret) => {
+  const plainText = typeof data === 'object' ? JSON.stringify(data) : String(data);
+  const iv = crypto.randomBytes(12);
+  const derivedKey = crypto.createHash('sha256').update(key).digest();
+  const cipher = crypto.createCipheriv('aes-256-gcm', derivedKey, iv);
+
+  let encrypted = cipher.update(plainText, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  const authTag = cipher.getAuthTag().toString('hex');
+
+  return `${iv.toString('hex')}:${authTag}:${encrypted}`;
+};
+
+/**
+ * Decrypt sensitive data encrypted with AES-256-GCM.
+ *
+ * @param {string} cipherText
+ * @param {string} [key]
+ * @returns {string|object}
+ */
+export const decryptData = (cipherText, key = config.cookies.secret) => {
+  if (!cipherText || !cipherText.includes(':')) {
+    return null;
+  }
+
+  const [ivHex, authTagHex, encryptedHex] = cipherText.split(':');
+  if (!ivHex || !authTagHex || !encryptedHex) {
+    return null;
+  }
+
+  const derivedKey = crypto.createHash('sha256').update(key).digest();
+  const decipher = crypto.createDecipheriv('aes-256-gcm', derivedKey, Buffer.from(ivHex, 'hex'));
+  decipher.setAuthTag(Buffer.from(authTagHex, 'hex'));
+
+  let decrypted = decipher.update(encryptedHex, 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+
+  try {
+    return JSON.parse(decrypted);
+  } catch {
+    return decrypted;
+  }
+};
+

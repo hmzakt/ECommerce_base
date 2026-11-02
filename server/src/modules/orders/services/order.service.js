@@ -11,6 +11,7 @@ import { ErrorCodes } from '../../../common/errors/errorCodes.js';
 import { logger } from '../../../common/logger/index.js';
 import { buildPaginationMeta } from '../../../common/utils/response.js';
 import { emailService } from '../../../common/email/email.service.js';
+import { outboxService, OutboxEventTypes } from '../../shipping/services/outbox.service.js';
 
 // ─── Status Transition Rules ────────────────────────────────────────────────────
 
@@ -301,7 +302,32 @@ export const orderService = {
       validateTransition(existingOrder.status, statusData.status);
     }
 
-    const updatedOrder = await orderRepository.updateOrderStatus(orderId, statusData);
+    const updatedOrder = await prisma.$transaction(async (tx) => {
+      const u = await tx.order.update({
+        where: { id: orderId },
+        data: statusData,
+        include: {
+          items: true,
+          shippingAddress: true,
+          user: true,
+        },
+      });
+
+      const becameConfirmed =
+        statusData.status === 'CONFIRMED' ||
+        (statusData.paymentStatus === 'PAID' && existingOrder.paymentStatus !== 'PAID');
+
+      if (becameConfirmed) {
+        await outboxService.createEvent(tx, {
+          eventType: OutboxEventTypes.ORDER_CONFIRMED_FOR_SHIPMENT,
+          aggregateId: orderId,
+          aggregateType: 'ORDER',
+          payload: { orderId, trigger: 'ADMIN_CONFIRMED' },
+        });
+      }
+
+      return u;
+    });
 
     logger.info(
       { orderId, oldStatus: existingOrder.status, newStatus: statusData.status ?? existingOrder.status },

@@ -13,6 +13,7 @@ import { createApp } from './app.js';
 import { prisma } from './prisma/client.js';
 import { logger } from './common/logger/index.js';
 import { config } from './config/index.js';
+import { shippingOutboxWorker } from './modules/shipping/workers/outbox.worker.js';
 
 const GRACEFUL_SHUTDOWN_TIMEOUT_MS = 10_000; // 10 seconds
 
@@ -38,11 +39,23 @@ const startServer = async () => {
       },
       `Server running on port ${config.server.port} [${config.env}]`,
     );
+
+    // ── 2b. Start background Logistics Outbox Worker if enabled ──────────────────
+    if (config.shipping.enableWorker) {
+      shippingOutboxWorker.start();
+    }
   });
 
   // ── 3. Graceful shutdown handler ─────────────────────────────────────────────
   const shutdown = async (signal) => {
     logger.info({ signal }, `Received ${signal}. Starting graceful shutdown...`);
+
+    // Stop shipping outbox worker
+    try {
+      await shippingOutboxWorker.stop();
+    } catch (err) {
+      logger.error({ err }, 'Error stopping shipping worker.');
+    }
 
     // Stop accepting new connections
     server.close(async () => {

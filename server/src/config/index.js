@@ -46,6 +46,14 @@ const envSchema = z.object({
   RAZORPAY_KEY_ID: z.string().default('rzp_test_placeholder_key_id'),
   RAZORPAY_KEY_SECRET: z.string().default('rzp_test_placeholder_key_secret'),
   RAZORPAY_WEBHOOK_SECRET: z.string().default('rzp_test_placeholder_webhook_secret'),
+
+  // Shiprocket & Logistics
+  SHIPROCKET_EMAIL: z.string().default(''),
+  SHIPROCKET_PASSWORD: z.string().default(''),
+  SHIPROCKET_BASE_URL: z.string().default('https://apiv2.shiprocket.in/v1/external'),
+  SHIPROCKET_MOCK: z.string().default('true').transform((val) => val === 'true'),
+  ENABLE_SHIPPING_WORKER: z.string().default('true').transform((val) => val === 'true'),
+  SHIPPING_WORKER_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(5000),
 });
 
 // ────────────────────────────────────────────────────────────────────────────────
@@ -121,6 +129,15 @@ export const config = Object.freeze({
     keyId: env.RAZORPAY_KEY_ID,
     keySecret: env.RAZORPAY_KEY_SECRET,
     webhookSecret: env.RAZORPAY_WEBHOOK_SECRET,
+  }),
+
+  shipping: Object.freeze({
+    shiprocketEmail: env.SHIPROCKET_EMAIL,
+    shiprocketPassword: env.SHIPROCKET_PASSWORD,
+    shiprocketBaseUrl: env.SHIPROCKET_BASE_URL,
+    isMock: env.SHIPROCKET_MOCK,
+    enableWorker: env.ENABLE_SHIPPING_WORKER,
+    workerPollIntervalMs: env.SHIPPING_WORKER_POLL_INTERVAL_MS,
   }),
 });
 
