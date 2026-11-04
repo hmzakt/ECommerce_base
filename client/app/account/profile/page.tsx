@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@/lib/context/AuthContext";
 import { updateProfileApi } from "@/lib/api/auth";
 import { ApiClientError } from "@/lib/api/client";
 
 export default function ProfilePage() {
   const { user, accessToken, fetchMe } = useAuth();
+  const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
@@ -59,17 +61,56 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-medium">Profile</h2>
-        {!isEditing && (
-          <button
-            onClick={() => { setIsEditing(true); setSuccessMsg(""); }}
-            className="text-sm px-4 py-2 border border-border hover:bg-muted/50 transition-colors"
-          >
-            Edit Profile
-          </button>
-        )}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-medium">Profile</h2>
+          {isAdmin && (
+            <span className="text-[11px] font-mono uppercase bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded-full font-medium">
+              {user.role}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className="inline-flex items-center gap-1.5 text-sm px-4 py-2 bg-foreground text-background hover:bg-foreground/85 font-medium transition-colors shadow-sm"
+            >
+              <span>Admin Dashboard</span>
+              <span>→</span>
+            </Link>
+          )}
+          {!isEditing && (
+            <button
+              onClick={() => { setIsEditing(true); setSuccessMsg(""); }}
+              className="text-sm px-4 py-2 border border-border hover:bg-muted/50 transition-colors"
+            >
+              Edit Profile
+            </button>
+          )}
+        </div>
       </div>
+
+      {isAdmin && (
+        <div className="p-4 bg-surface border border-border rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <span className="text-xl">⚡</span>
+            <div>
+              <p className="text-sm font-medium">Administrator Privileges Active</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Manage storefront products, inventory, customer orders, and shipping logistics.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/admin"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 bg-foreground text-background hover:bg-foreground/85 transition-colors whitespace-nowrap self-start sm:self-auto"
+          >
+            <span>Open Dashboard</span>
+            <span>→</span>
+          </Link>
+        </div>
+      )}
 
       {successMsg && (
         <div className="bg-green-50 text-green-700 border border-green-200 text-sm p-4">

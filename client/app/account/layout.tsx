@@ -65,6 +65,16 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
                   </li>
                 );
               })}
+              {(user?.role === "ADMIN" || user?.role === "SUPER_ADMIN") && (
+                <li className="pt-3 border-t border-border mt-3">
+                  <Link
+                    href="/admin"
+                    className="block px-3 py-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 transition-colors"
+                  >
+                    ⚡ Admin Portal →
+                  </Link>
+                </li>
+              )}
             </ul>
           </nav>
 

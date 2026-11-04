@@ -16,6 +16,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function AccountDashboardPage() {
   const { user, accessToken } = useAuth();
+  const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
 
@@ -29,6 +30,30 @@ export default function AccountDashboardPage() {
 
   return (
     <div className="space-y-8">
+      {/* Admin Quick Action Banner */}
+      {isAdmin && (
+        <div className="p-5 bg-surface border border-border rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono uppercase bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded-full font-medium">
+                {user.role}
+              </span>
+              <h2 className="text-base font-medium">Admin Portal</h2>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Access the administrative dashboard to manage orders, catalog, users, and shipping operations.
+            </p>
+          </div>
+          <Link
+            href="/admin"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-foreground text-background hover:bg-foreground/85 text-xs font-semibold transition-colors whitespace-nowrap self-start sm:self-auto"
+          >
+            <span>Go to Admin Dashboard</span>
+            <span>→</span>
+          </Link>
+        </div>
+      )}
+
       {/* Welcome + Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Link
