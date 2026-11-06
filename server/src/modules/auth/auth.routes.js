@@ -65,6 +65,13 @@ router.post(
   asyncHandler(authController.verifyEmail)
 );
 
+// Google OAuth — public, rate-limited
+router.post(
+  '/google',
+  authLimiter,
+  asyncHandler(authController.googleAuth)
+);
+
 // ────────────────────────────────────────────────────────────────────────────────
 // Protected Routes
 // ────────────────────────────────────────────────────────────────────────────────

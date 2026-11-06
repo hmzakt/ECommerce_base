@@ -6,6 +6,15 @@ import { AppError } from '../../common/errors/AppError.js';
 import { ErrorCodes } from '../../common/errors/errorCodes.js';
 import { verifyAccessToken } from '../../common/utils/crypto.js';
 import { userRepository } from '../users/user.repository.js';
+import { OAuth2Client } from 'google-auth-library';
+
+// Lazily-created Google OAuth client — only used if GOOGLE_CLIENT_ID is set
+let _googleClient = null;
+function getGoogleClient() {
+  if (!config.google.clientId) return null;
+  if (!_googleClient) _googleClient = new OAuth2Client(config.google.clientId);
+  return _googleClient;
+}
 
 /**
  * Auth Controller
@@ -134,6 +143,7 @@ export const authController = {
           phone: user.phone,
           role: user.role,
           isEmailVerified: user.isEmailVerified,
+          authProvider: user.authProvider,
           createdAt: user.createdAt,
         },
       },
@@ -224,6 +234,58 @@ export const authController = {
           createdAt: updatedUser.createdAt,
         },
       },
+    });
+  },
+
+  /**
+   * Google OAuth — verify Google ID token and issue app JWT pair.
+   * Accepts: POST /auth/google  { credential: "<google-id-token>" }
+   */
+  googleAuth: async (req, res) => {
+    const { credential } = req.body;
+
+    if (!credential || typeof credential !== 'string') {
+      throw AppError.badRequest('Google credential is required.', ErrorCodes.VALIDATION_ERROR);
+    }
+
+    const googleClient = getGoogleClient();
+    if (!googleClient) {
+      throw AppError.badRequest(
+        'Google Sign-In is not configured on this server.',
+        ErrorCodes.VALIDATION_ERROR,
+      );
+    }
+
+    // Verify the Google ID token
+    let ticket;
+    try {
+      ticket = await googleClient.verifyIdToken({
+        idToken: credential,
+        audience: config.google.clientId,
+      });
+    } catch {
+      throw AppError.unauthorized('Invalid or expired Google token.', ErrorCodes.TOKEN_INVALID);
+    }
+
+    const payload = ticket.getPayload();
+    if (!payload?.sub || !payload?.email) {
+      throw AppError.unauthorized('Incomplete Google profile.', ErrorCodes.TOKEN_INVALID);
+    }
+
+    const { user, accessToken, refreshToken } = await authService.googleOAuth({
+      googleId: payload.sub,
+      email: payload.email,
+      firstName: payload.given_name || payload.name?.split(' ')[0] || 'User',
+      lastName: payload.family_name || payload.name?.split(' ').slice(1).join(' ') || '',
+      emailVerified: !!payload.email_verified,
+    });
+
+    res.cookie(CookieNames.REFRESH_TOKEN, refreshToken, config.cookies.refreshTokenOptions);
+
+    sendSuccess(res, {
+      message: 'Google Sign-In successful',
+      statusCode: 200,
+      data: { user, accessToken },
     });
   },
 };

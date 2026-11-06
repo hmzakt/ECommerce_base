@@ -16,6 +16,7 @@ import {
   getMeApi,
   logoutApi,
   refreshTokenApi,
+  googleAuthApi,
 } from "@/lib/api/auth";
 
 interface AuthContextValue {
@@ -25,6 +26,7 @@ interface AuthContextValue {
   isLoading: boolean;
   login: (payload: LoginPayload) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<void>;
+  googleLogin: (credential: string) => Promise<void>;
   logout: () => Promise<void>;
   fetchMe: () => Promise<void>;
 }
@@ -107,6 +109,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [saveToken],
   );
 
+  const googleLogin = useCallback(
+    async (credential: string) => {
+      const { user: u, accessToken: token } = await googleAuthApi(credential);
+      setUser(u);
+      saveToken(token);
+    },
+    [saveToken],
+  );
+
   const logout = useCallback(async () => {
     if (accessToken) {
       try {
@@ -138,10 +149,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isLoading,
       login,
       register,
+      googleLogin,
       logout,
       fetchMe,
     }),
-    [user, accessToken, isLoading, login, register, logout, fetchMe],
+    [user, accessToken, isLoading, login, register, googleLogin, logout, fetchMe],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

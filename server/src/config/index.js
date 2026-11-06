@@ -54,6 +54,20 @@ const envSchema = z.object({
   SHIPROCKET_MOCK: z.string().default('true').transform((val) => val === 'true'),
   ENABLE_SHIPPING_WORKER: z.string().default('true').transform((val) => val === 'true'),
   SHIPPING_WORKER_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(5000),
+
+  // Email (SMTP)
+  SMTP_HOST: z.string().default(''),
+  SMTP_PORT: z.coerce.number().int().default(587),
+  SMTP_USER: z.string().default(''),
+  SMTP_PASS: z.string().default(''),
+  EMAIL_FROM: z.string().default('"Maison Atelier" <no-reply@maisonatelier.com>'),
+
+  // Client URL (used in email links)
+  CLIENT_URL: z.string().default('http://localhost:3001'),
+
+  // Google OAuth
+  GOOGLE_CLIENT_ID: z.string().default(''),
+  GOOGLE_CLIENT_SECRET: z.string().default(''),
 });
 
 // ────────────────────────────────────────────────────────────────────────────────
@@ -138,6 +152,21 @@ export const config = Object.freeze({
     isMock: env.SHIPROCKET_MOCK,
     enableWorker: env.ENABLE_SHIPPING_WORKER,
     workerPollIntervalMs: env.SHIPPING_WORKER_POLL_INTERVAL_MS,
+  }),
+
+  email: Object.freeze({
+    smtpHost: env.SMTP_HOST,
+    smtpPort: env.SMTP_PORT,
+    smtpUser: env.SMTP_USER,
+    smtpPass: env.SMTP_PASS,
+    from: env.EMAIL_FROM,
+  }),
+
+  clientUrl: env.CLIENT_URL,
+
+  google: Object.freeze({
+    clientId: env.GOOGLE_CLIENT_ID,
+    clientSecret: env.GOOGLE_CLIENT_SECRET,
   }),
 });
 

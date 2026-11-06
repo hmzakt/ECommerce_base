@@ -98,6 +98,10 @@ export async function resendVerificationApi(accessToken: string): Promise<void> 
   await authRequest("/auth/resend-verification", { accessToken });
 }
 
+export async function googleAuthApi(credential: string): Promise<AuthResponse> {
+  return authRequest<AuthResponse>("/auth/google", { body: { credential } });
+}
+
 export async function updateProfileApi(
   accessToken: string,
   data: { firstName?: string; lastName?: string; phone?: string | null }

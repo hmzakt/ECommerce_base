@@ -39,7 +39,11 @@ model User {
 
   // Auth credentials
   email        String  @unique
-  passwordHash String  @map("password_hash")
+  passwordHash String? @map("password_hash") // nullable for OAuth-only accounts
+
+  // OAuth
+  googleId     String? @unique @map("google_id")
+  authProvider String  @default("LOCAL") @map("auth_provider") // LOCAL | GOOGLE
 
   // Profile
   firstName String  @map("first_name")
@@ -65,8 +69,8 @@ model User {
   updatedAt DateTime @updatedAt      @map("updated_at")
 
   // Relations
-  cart      Cart?    // reverse relation — not a new column
-  orders    Order[]  // reverse relation — not a new column
+  cart      Cart?     // reverse relation — not a new column
+  orders    Order[]   // reverse relation — not a new column
 
   // Explicit table name
   @@map("users")
@@ -76,6 +80,7 @@ model User {
   @@index([role])
   @@index([isActive])
   @@index([createdAt])
+  @@index([googleId])
 }
 
 // ────────────────────────────────────────────────────────────────────────────────

@@ -179,4 +179,16 @@ export const userRepository = {
       data: { isEmailVerified: true },
     });
   },
+
+  /**
+   * Find a user by their Google OAuth ID.
+   *
+   * @param {string} googleId
+   * @returns {Promise<import('@prisma/client').User | null>}
+   */
+  findByGoogleId: async (googleId) => {
+    return prisma.user.findUnique({
+      where: { googleId },
+    });
+  },
 };

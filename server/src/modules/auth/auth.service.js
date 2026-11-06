@@ -4,10 +4,14 @@ import {
   verifyHash,
   generateAccessToken,
   generateRefreshToken,
+  generateEmailVerificationToken,
+  verifyEmailVerificationToken,
 } from '../../common/utils/crypto.js';
 import { AppError } from '../../common/errors/AppError.js';
 import { ErrorCodes } from '../../common/errors/errorCodes.js';
 import { logger } from '../../common/logger/index.js';
+import { sendEmailVerification, sendPasswordReset } from '../../common/utils/emailService.js';
+import { config } from '../../config/index.js';
 
 /**
  * Authentication Service
@@ -16,9 +20,40 @@ import { logger } from '../../common/logger/index.js';
  * Does not know about HTTP concepts (req, res, cookies).
  */
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Build a sanitized user object safe to return to the client.
+ */
+function sanitizeUser(user) {
+  return {
+    id: user.id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    email: user.email,
+    role: user.role,
+    isEmailVerified: user.isEmailVerified,
+    authProvider: user.authProvider,
+  };
+}
+
+/**
+ * Generate a full token pair and persist the refresh token hash.
+ */
+async function issueTokenPair(user) {
+  const accessToken = generateAccessToken({ userId: user.id, role: user.role });
+  const refreshToken = generateRefreshToken();
+  const refreshTokenHash = await hashData(refreshToken);
+  await userRepository.updateRefreshToken(user.id, refreshTokenHash);
+  return { accessToken, refreshToken };
+}
+
+// ─── Service ──────────────────────────────────────────────────────────────────
+
 export const authService = {
   /**
-   * Register a new user.
+   * Register a new user with email + password.
+   * Sends a verification email after account creation.
    */
   register: async ({ firstName, lastName, email, password, phone }) => {
     // 1. Check if user already exists
@@ -37,123 +72,148 @@ export const authService = {
       email,
       passwordHash,
       phone,
+      authProvider: 'LOCAL',
     });
 
-    // 4. Generate tokens
-    const accessToken = generateAccessToken({ userId: user.id, role: user.role });
-    const refreshToken = generateRefreshToken();
+    // 4. Issue tokens
+    const { accessToken, refreshToken } = await issueTokenPair(user);
 
-    // 5. Store hashed refresh token in DB
-    const refreshTokenHash = await hashData(refreshToken);
-    await userRepository.updateRefreshToken(user.id, refreshTokenHash);
-
-    // 6. Generate and log email verification link
-    const { generateEmailVerificationToken } = await import('../../common/utils/crypto.js');
+    // 5. Send verification email (non-blocking — don't fail registration if mail fails)
     const emailToken = generateEmailVerificationToken(user.id);
-    const verifyUrl = `http://localhost:3001/verify-email?token=${emailToken}`;
-    logger.info({ userId: user.id, verifyUrl }, 'MOCK EMAIL: Email verification link generated');
+    const verifyUrl = `${config.clientUrl}/verify-email?token=${emailToken}`;
+
+    sendEmailVerification({ to: email, firstName, verificationUrl: verifyUrl }).catch((err) => {
+      logger.error({ err, userId: user.id }, 'Failed to send verification email after registration');
+    });
 
     logger.info({ userId: user.id }, 'New user registered successfully');
 
-    // 7. Return user details (without sensitive fields) and tokens
-    return {
-      user: {
-        id: user.id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.role,
-      },
-      accessToken,
-      refreshToken,
-    };
+    return { user: sanitizeUser(user), accessToken, refreshToken };
   },
 
   /**
-   * Resend verification email
+   * Resend verification email to an already-registered (but unverified) user.
    */
   resendVerificationEmail: async (userId) => {
     const user = await userRepository.findById(userId);
     if (!user) throw AppError.notFound('User not found');
     if (user.isEmailVerified) throw AppError.badRequest('Email is already verified');
 
-    const { generateEmailVerificationToken } = await import('../../common/utils/crypto.js');
     const emailToken = generateEmailVerificationToken(user.id);
-    const verifyUrl = `http://localhost:3001/verify-email?token=${emailToken}`;
-    logger.info({ userId: user.id, verifyUrl }, 'MOCK EMAIL: Email verification link generated');
+    const verifyUrl = `${config.clientUrl}/verify-email?token=${emailToken}`;
+
+    await sendEmailVerification({
+      to: user.email,
+      firstName: user.firstName,
+      verificationUrl: verifyUrl,
+    });
+
+    logger.info({ userId: user.id }, 'Verification email resent');
   },
 
   /**
-   * Verify email using token
+   * Verify email using the JWT token sent in the verification link.
    */
   verifyEmail: async (token) => {
-    const { verifyEmailVerificationToken } = await import('../../common/utils/crypto.js');
     try {
       const decoded = verifyEmailVerificationToken(token);
       await userRepository.verifyEmail(decoded.userId);
       logger.info({ userId: decoded.userId }, 'Email verified successfully');
-    } catch (err) {
-      throw AppError.badRequest('Invalid or expired verification token', ErrorCodes.VALIDATION_ERROR);
+    } catch {
+      throw AppError.badRequest(
+        'Invalid or expired verification token.',
+        ErrorCodes.VALIDATION_ERROR,
+      );
     }
   },
 
   /**
-   * Login an existing user.
+   * Login with email + password.
    */
   login: async ({ email, password }) => {
-    // Generic error to prevent email enumeration
     const invalidCredentialsError = AppError.unauthorized(
       'Invalid email or password',
       ErrorCodes.INVALID_CREDENTIALS,
     );
 
-    // 1. Find user
     const user = await userRepository.findByEmail(email);
-    if (!user) {
+    if (!user) throw invalidCredentialsError;
+
+    if (!user.isActive) {
+      throw AppError.forbidden('Account has been deactivated.', ErrorCodes.ACCOUNT_DEACTIVATED);
+    }
+
+    // OAuth-only accounts have no password
+    if (!user.passwordHash) {
+      throw AppError.badRequest(
+        'This account was created with Google Sign-In. Please use Google to log in.',
+        ErrorCodes.INVALID_CREDENTIALS,
+      );
+    }
+
+    const isValidPassword = await verifyHash(user.passwordHash, password);
+    if (!isValidPassword) {
+      logger.warn({ userId: user.id, email }, 'Failed login attempt: invalid password');
       throw invalidCredentialsError;
+    }
+
+    const { accessToken, refreshToken } = await issueTokenPair(user);
+
+    logger.info({ userId: user.id }, 'User logged in successfully');
+
+    return { user: sanitizeUser(user), accessToken, refreshToken };
+  },
+
+  /**
+   * Google OAuth — find or create a user from a verified Google profile.
+   * Accepts the decoded Google ID token payload (verified by the controller).
+   *
+   * @param {{ googleId: string, email: string, firstName: string, lastName: string, emailVerified: boolean }} profile
+   */
+  googleOAuth: async ({ googleId, email, firstName, lastName, emailVerified }) => {
+    // 1. Try to find existing account by googleId
+    let user = await userRepository.findByGoogleId(googleId);
+
+    if (!user) {
+      // 2. Try to find account by email (user may have registered with password first)
+      const existingByEmail = await userRepository.findByEmail(email);
+
+      if (existingByEmail) {
+        // Link Google to the existing account
+        user = await userRepository.update(existingByEmail.id, {
+          googleId,
+          authProvider: existingByEmail.authProvider === 'LOCAL' ? 'LOCAL_GOOGLE' : 'GOOGLE',
+          isEmailVerified: existingByEmail.isEmailVerified || emailVerified,
+        });
+        logger.info({ userId: user.id }, 'Google account linked to existing user');
+      } else {
+        // 3. Create brand-new user via Google
+        user = await userRepository.create({
+          firstName,
+          lastName,
+          email,
+          passwordHash: null,
+          googleId,
+          authProvider: 'GOOGLE',
+          isEmailVerified: emailVerified,
+        });
+        logger.info({ userId: user.id }, 'New user created via Google OAuth');
+      }
     }
 
     if (!user.isActive) {
       throw AppError.forbidden('Account has been deactivated.', ErrorCodes.ACCOUNT_DEACTIVATED);
     }
 
-    // 2. Verify password
-    const isValidPassword = await verifyHash(user.passwordHash, password);
-    if (!isValidPassword) {
-      // Log failed attempts for security monitoring
-      logger.warn({ userId: user.id, email }, 'Failed login attempt: invalid password');
-      throw invalidCredentialsError;
-    }
+    const { accessToken, refreshToken } = await issueTokenPair(user);
 
-    // 3. Generate new tokens
-    const accessToken = generateAccessToken({ userId: user.id, role: user.role });
-    const refreshToken = generateRefreshToken();
-
-    // 4. Update refresh token hash in DB (invalidates any previous session)
-    const refreshTokenHash = await hashData(refreshToken);
-    await userRepository.updateRefreshToken(user.id, refreshTokenHash);
-
-    logger.info({ userId: user.id }, 'User logged in successfully');
-
-    return {
-      user: {
-        id: user.id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.role,
-      },
-      accessToken,
-      refreshToken,
-    };
+    return { user: sanitizeUser(user), accessToken, refreshToken };
   },
 
   /**
-   * Refresh access token using a valid refresh token.
-   * Implements Refresh Token Rotation.
+   * Refresh access token (Refresh Token Rotation).
    */
   refresh: async (userId, rawRefreshToken) => {
-    // 1. Find user
     const user = await userRepository.findById(userId);
     if (!user || !user.refreshTokenHash) {
       throw AppError.unauthorized('Invalid refresh token.', ErrorCodes.REFRESH_TOKEN_INVALID);
@@ -163,34 +223,26 @@ export const authService = {
       throw AppError.forbidden('Account has been deactivated.', ErrorCodes.ACCOUNT_DEACTIVATED);
     }
 
-    // 2. Verify the raw token matches the stored hash
     const isValidToken = await verifyHash(user.refreshTokenHash, rawRefreshToken);
     if (!isValidToken) {
-      // Possible token theft / replay attack!
       logger.error(
         { userId },
-        'SECURITY ALERT: Invalid refresh token presented for active session. Revoking all tokens.',
+        'SECURITY ALERT: Invalid refresh token presented. Revoking all tokens.',
       );
       await userRepository.clearRefreshToken(userId);
       throw AppError.unauthorized('Invalid refresh token.', ErrorCodes.REFRESH_TOKEN_INVALID);
     }
 
-    // 3. Generate fresh token pair (Rotation)
     const accessToken = generateAccessToken({ userId: user.id, role: user.role });
     const newRefreshToken = generateRefreshToken();
-
-    // 4. Save new hash
     const newRefreshTokenHash = await hashData(newRefreshToken);
     await userRepository.updateRefreshToken(user.id, newRefreshTokenHash);
 
-    return {
-      accessToken,
-      refreshToken: newRefreshToken,
-    };
+    return { accessToken, refreshToken: newRefreshToken };
   },
 
   /**
-   * Logout user by clearing their refresh token in the DB.
+   * Logout — clears refresh token in DB.
    */
   logout: async (userId) => {
     await userRepository.clearRefreshToken(userId);
@@ -202,31 +254,21 @@ export const authService = {
    */
   forgotPassword: async (email) => {
     const user = await userRepository.findByEmail(email);
-    if (!user) {
-      // Return successfully to prevent email enumeration
-      return;
-    }
+    if (!user) return; // Prevent email enumeration
 
-    import('crypto').then(async (crypto) => {
-      // 1. Generate token
-      const resetToken = crypto.randomBytes(32).toString('hex');
-      const passwordResetToken = crypto
-        .createHash('sha256')
-        .update(resetToken)
-        .digest('hex');
+    // OAuth-only accounts have no password to reset
+    if (user.authProvider === 'GOOGLE') return;
 
-      const passwordResetExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+    const crypto = await import('crypto');
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const passwordResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+    const passwordResetExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 min
 
-      // 2. Save hashed token
-      await userRepository.update(user.id, {
-        passwordResetToken,
-        passwordResetExpires,
-      });
+    await userRepository.update(user.id, { passwordResetToken, passwordResetExpires });
 
-      // 3. "Send" email (mock)
-      const resetUrl = `http://localhost:3001/reset-password?token=${resetToken}`;
-      logger.info({ email, resetUrl }, 'MOCK EMAIL: Password reset link generated');
-    });
+    const resetUrl = `${config.clientUrl}/reset-password?token=${resetToken}`;
+
+    await sendPasswordReset({ to: email, firstName: user.firstName, resetUrl });
   },
 
   /**
@@ -234,10 +276,7 @@ export const authService = {
    */
   resetPassword: async (token, newPassword) => {
     const crypto = await import('crypto');
-    const hashedToken = crypto
-      .createHash('sha256')
-      .update(token)
-      .digest('hex');
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
     const user = await userRepository.findByPasswordResetToken(hashedToken);
     if (!user) {

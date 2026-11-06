@@ -7,16 +7,19 @@ import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/lib/context/AuthContext";
 import { ApiClientError } from "@/lib/api/client";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
-  
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  const redirect = searchParams.get("redirect") || "/account";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,7 +28,6 @@ function LoginForm() {
 
     try {
       await login({ email, password });
-      const redirect = searchParams.get("redirect") || "/account";
       router.push(redirect);
     } catch (err) {
       if (err instanceof ApiClientError) {
@@ -42,7 +44,25 @@ function LoginForm() {
     <div className="section-padding bg-muted/30 min-h-[70vh] flex items-center">
       <Container size="narrow" className="max-w-md w-full mx-auto">
         <div className="bg-surface p-8 shadow-sm">
-          <h1 className="font-display text-3xl font-light text-center mb-8">Login</h1>
+          <h1 className="font-display text-3xl font-light text-center mb-8">Sign In</h1>
+
+          {/* Google Sign-In */}
+          <div className="mb-6">
+            <GoogleSignInButton
+              onError={(msg) => setError(msg)}
+              redirectTo={redirect}
+            />
+          </div>
+
+          {/* Divider */}
+          <div className="relative mb-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase tracking-widest">
+              <span className="bg-surface px-4 text-muted-foreground">or</span>
+            </div>
+          </div>
 
           {error && (
             <div className="bg-red-50 text-red-600 p-4 mb-6 text-sm border border-red-100">
@@ -90,12 +110,12 @@ function LoginForm() {
             </div>
 
             <Button type="submit" className="w-full h-12" disabled={isLoading}>
-              {isLoading ? "Signing in..." : "Sign In"}
+              {isLoading ? "Signing in…" : "Sign In"}
             </Button>
           </form>
 
           <div className="mt-8 text-center text-sm text-muted-foreground border-t border-border pt-6">
-            Don't have an account?{" "}
+            Don&apos;t have an account?{" "}
             <Link
               href="/register"
               className="text-foreground hover:underline underline-offset-4 font-medium"

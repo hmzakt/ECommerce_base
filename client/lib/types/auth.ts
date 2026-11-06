@@ -6,6 +6,7 @@ export interface User {
   phone?: string | null;
   role: "CUSTOMER" | "ADMIN" | "SUPER_ADMIN";
   isEmailVerified?: boolean;
+  authProvider?: "LOCAL" | "GOOGLE" | "LOCAL_GOOGLE";
   createdAt?: string;
 }
 
